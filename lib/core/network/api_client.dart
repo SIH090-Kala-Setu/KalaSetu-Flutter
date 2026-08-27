@@ -174,11 +174,18 @@ class ApiClient {
     double? maxPrice,
   }) async {
     final queryParams = <String, dynamic>{};
-    if (craft != null && craft.isNotEmpty && craft != 'All')
+    if (craft != null && craft.isNotEmpty && craft != 'All') {
       queryParams['craft'] = craft;
-    if (state != null && state.isNotEmpty) queryParams['state'] = state;
-    if (minPrice != null) queryParams['min_price'] = minPrice;
-    if (maxPrice != null) queryParams['max_price'] = maxPrice;
+    }
+    if (state != null && state.isNotEmpty) {
+      queryParams['state'] = state;
+    }
+    if (minPrice != null) {
+      queryParams['min_price'] = minPrice;
+    }
+    if (maxPrice != null) {
+      queryParams['max_price'] = maxPrice;
+    }
 
     final response = await _dio.get(
       ApiEndpoints.products,
