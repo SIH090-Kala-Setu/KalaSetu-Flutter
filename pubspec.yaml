@@ -1,0 +1,46 @@
+name: learningdart
+description: "कलाSetu - AI-powered mobile application for MoSJE"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  flutter_riverpod: any
+  go_router: any
+  dio: any
+  flutter_secure_storage: any
+  shared_preferences: any
+  google_fonts: any
+  image_picker: any
+  camera: any
+  image_cropper: any
+  record: any
+  just_audio: any
+  intl: any
+  logger: any
+  json_annotation: any
+  freezed_annotation: any
+  cached_network_image: any
+  shimmer: any
+  permission_handler: any
+  flutter_dotenv: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: any
+  json_serializable: any
+  freezed: any
+
+flutter:
+  uses-material-design: true
+  generate: true
