@@ -16,6 +16,14 @@ class ApiEndpoints {
     if (_overrideBaseUrl.isNotEmpty) {
       return _overrideBaseUrl;
     }
+
+    // 1. Build-time environment variable (e.g. flutter build apk --dart-define=BACKEND_URL=https://api.yourdomain.com)
+    const envUrl = String.fromEnvironment('BACKEND_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl.endsWith('/') ? envUrl.substring(0, envUrl.length - 1) : envUrl;
+    }
+
+    // 2. Default local development fallbacks
     if (kIsWeb) {
       return 'http://localhost:8000';
     }

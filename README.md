@@ -219,14 +219,51 @@ All 62+ endpoints are typed and wired in [`ApiClient`](lib/core/network/api_clie
 
 ---
 
-## 🔌 Backend Configuration & Live PostgreSQL Connection
+## 🔌 Backend Configuration & Deployment URL Management
 
-The application connects directly to the FastAPI server (`http://127.0.0.1:8000`) and displays live PostgreSQL records.
+The application communicates with the FastAPI backend through [`ApiEndpoints`](lib/core/network/api_endpoints.dart). You have **3 ways** to change or configure the backend URL:
 
-- **Dynamic Platform Resolution**:
-  - **Windows Desktop / Web / iOS**: Resolves to `http://127.0.0.1:8000` (or `http://localhost:8000`).
-  - **Android Emulator**: Resolves to `http://10.0.2.2:8000` (automatic host loopback).
-  - **Physical Device**: Tap the **⚙️ Server Settings** icon on the Welcome Screen to enter your PC's local Wi-Fi IP (e.g., `http://192.168.1.15:8000`) or run `adb reverse tcp:8000 tcp:8000`.
+### 1. 🏗️ Build-Time Flag for Production (Recommended / CI-CD)
+Inject your production URL directly when compiling your release binaries without modifying any code:
+```bash
+# Build Android Release APK with Production Backend
+flutter build apk --split-per-abi --dart-define=BACKEND_URL=https://api.kalasetu.gov.in
+
+# Build Web Release with Production Backend
+flutter build web --dart-define=BACKEND_URL=https://api.kalasetu.gov.in
+
+# Build Windows Desktop Executable
+flutter build windows --dart-define=BACKEND_URL=https://api.kalasetu.gov.in
+```
+
+### 2. 📝 In Code Default: `lib/core/network/api_endpoints.dart`
+To change the default fallback backend URL permanently in the source code, edit [`lib/core/network/api_endpoints.dart`](lib/core/network/api_endpoints.dart):
+```dart
+class ApiEndpoints {
+  static String get baseUrl {
+    if (_overrideBaseUrl.isNotEmpty) return _overrideBaseUrl;
+
+    const envUrl = String.fromEnvironment('BACKEND_URL');
+    if (envUrl.isNotEmpty) return envUrl;
+
+    // 👈 Edit your production URL here:
+    return 'https://api.yourdomain.com';
+  }
+}
+```
+
+### 3. ⚙️ In-App Runtime Configuration (Zero Rebuilds)
+- Tap the **⚙️ Server Settings** icon on the Welcome Screen or Profile Screen.
+- Enter the target backend URL (e.g. `https://api.kalasetu.gov.in` or local IP `http://192.168.1.15:8000`).
+- The app immediately updates all active Dio HTTP interceptors and requests without restarting or rebuilding.
+
+---
+
+### 🌐 Automatic Local Development Resolution
+If no custom or environment URL is supplied, the client dynamically resolves:
+- **Windows Desktop / Web / iOS**: `http://127.0.0.1:8000`
+- **Android Emulator**: `http://10.0.2.2:8000` (maps to host `localhost:8000`)
+- **Physical Device over USB**: Run `adb reverse tcp:8000 tcp:8000` to forward device traffic to host `localhost:8000`.
 
 ---
 

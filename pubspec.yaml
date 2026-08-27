@@ -16,7 +16,7 @@ dependencies:
   flutter_riverpod: any
   go_router: any
   dio: any
-  flutter_secure_storage: any
+  flutter_secure_storage: ^9.2.2
   shared_preferences: any
   google_fonts: any
   image_picker: any
@@ -30,7 +30,7 @@ dependencies:
   freezed_annotation: any
   cached_network_image: any
   shimmer: any
-  permission_handler: any
+  permission_handler: ^11.3.1
   flutter_dotenv: any
 
 dev_dependencies:
