@@ -4,14 +4,49 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/l10n/app_localizations.dart';
+import '../../../core/network/api_client.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../auth/providers/auth_provider.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  Map<String, dynamic>? _profileData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfile();
+  }
+
+  void _fetchProfile() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final data = await apiClient.getArtisanProfile();
+      if (mounted) {
+        setState(() {
+          _profileData = data;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _showBankEditSheet(BuildContext context) {
+    final bankCtrl = TextEditingController(text: _profileData?['bank_account']?.toString() ?? '');
+    final ifscCtrl = TextEditingController(text: _profileData?['ifsc_code']?.toString() ?? '');
+    final upiCtrl = TextEditingController(text: _profileData?['upi_id']?.toString() ?? '');
+    bool isSaving = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -20,53 +55,107 @@ class ProfileScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Update Bank & Direct Payout Details', style: AppTextStyles.heading.copyWith(fontSize: 18)),
-              const SizedBox(height: 16),
-              const TextField(
-                decoration: InputDecoration(labelText: 'Bank Account Number', hintText: '1029384756'),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
-              const SizedBox(height: 12),
-              const TextField(
-                decoration: InputDecoration(labelText: 'IFSC Code', hintText: 'SBIN0000001'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Update Bank & Direct Payout Details', style: AppTextStyles.heading.copyWith(fontSize: 18)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: bankCtrl,
+                    decoration: const InputDecoration(labelText: 'Bank Account Number', hintText: '1029384756'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ifscCtrl,
+                    decoration: const InputDecoration(labelText: 'IFSC Code', hintText: 'SBIN0000001'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: upiCtrl,
+                    decoration: const InputDecoration(labelText: 'UPI ID', hintText: 'name@upi'),
+                  ),
+                  const SizedBox(height: 20),
+                  AppButton(
+                    label: 'Save Payout Details',
+                    isLoading: isSaving,
+                    onPressed: () async {
+                      setSheetState(() => isSaving = true);
+                      try {
+                        final apiClient = ref.read(apiClientProvider);
+                        await apiClient.updateArtisanProfile({
+                          'bank_account': bankCtrl.text.trim(),
+                          'ifsc_code': ifscCtrl.text.trim(),
+                          'upi_id': upiCtrl.text.trim(),
+                        });
+                        _fetchProfile();
+                      } catch (_) {}
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Bank details updated successfully')),
+                      );
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              const TextField(
-                decoration: InputDecoration(labelText: 'UPI ID', hintText: 'name@upi'),
-              ),
-              const SizedBox(height: 20),
-              AppButton(
-                label: 'Save Payout Details',
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Bank details updated successfully')),
-                  );
-                },
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
+  void _downloadReport() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final csv = await apiClient.getArtisanReport();
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('CSV Sales & Analytics Report'),
+            content: SingleChildScrollView(
+              child: Text(
+                csv.isNotEmpty ? csv : 'No sales records found.',
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to generate sales report.')),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final user = ref.watch(authProvider.notifier).currentUser;
-    final artisanName = user?.fullName ?? 'Ramesh Chandra';
-    final isVerified = user?.isVerified ?? false;
+    final artisanName = _profileData?['full_name'] ?? user?.fullName ?? 'Ramesh Chandra';
+    final isVerified = _profileData?['is_verified'] ?? user?.isVerified ?? false;
+    final craftType = _profileData?['craft_type'] ?? 'Handicrafts';
+    final clusterName = _profileData?['cluster_name'] ?? (_profileData?['cluster']?['name']) ?? 'Varanasi Cluster';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -81,197 +170,183 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20.0),
-        children: [
-          // Profile Header Card
-          AppCard(
-            padding: const EdgeInsets.all(20),
-            child: Row(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(20.0),
               children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  child: const Icon(Icons.person, size: 44, color: AppColors.primary),
+                // Profile Header Card
+                AppCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 36,
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                        child: const Icon(Icons.person, size: 44, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              artisanName,
+                              style: AppTextStyles.heading.copyWith(fontSize: 18),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  isVerified ? Icons.verified : Icons.hourglass_top,
+                                  color: isVerified ? AppColors.success : const Color(0xFFD68910),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isVerified ? 'MoSJE Verified' : 'KYC Pending Review',
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: isVerified ? AppColors.success : const Color(0xFFD68910),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(craftType, style: AppTextStyles.caption),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+                const SizedBox(height: 16),
+                // Cluster & Gov Scheme Info Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        artisanName,
-                        style: AppTextStyles.heading.copyWith(fontSize: 18),
-                      ),
-                      const SizedBox(height: 4),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(
-                            isVerified ? Icons.verified : Icons.hourglass_top,
-                            color: isVerified ? AppColors.success : const Color(0xFFD68910),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
                           Text(
-                            isVerified ? 'MoSJE Verified' : 'KYC Pending Review',
-                            style: AppTextStyles.caption.copyWith(
-                              color: isVerified ? AppColors.success : const Color(0xFFD68910),
-                              fontWeight: FontWeight.bold,
+                            'Assigned Cluster',
+                            style: AppTextStyles.caption.copyWith(color: Colors.white70),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'DBT Eligible',
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
-                        'Varanasi Silk Weaver Cluster · Uttar Pradesh',
-                        style: AppTextStyles.caption.copyWith(fontSize: 12),
+                        clusterName,
+                        style: AppTextStyles.heading.copyWith(color: Colors.white, fontSize: 16),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Craft Specialization Chips
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.craftType, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    Chip(
-                      avatar: const Text('🧵'),
-                      label: const Text('Textiles & Handloom'),
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                    ),
-                    Chip(
-                      avatar: const Text('🏺'),
-                      label: const Text('Clay & Pottery'),
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Analytics Summary Card
-          AppCard(
-            color: AppColors.primary,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Performance Overview',
-                      style: AppTextStyles.body.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.download, color: AppColors.accent),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Downloading CSV Sales Report...')),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStat('12', 'Listings'),
-                    _buildStat('184', 'Views'),
-                    _buildStat('18', 'Inquiries'),
-                    _buildStat('₹24.5k', 'Earnings'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Bank / UPI Details
-          AppCard(
-            onTap: () => _showBankEditSheet(context),
-            child: Row(
-              children: [
-                const Icon(Icons.account_balance, color: AppColors.primary, size: 24),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 20),
+                // Bank Details Card
+                AppCard(
+                  onTap: () => _showBankEditSheet(context),
+                  child: Row(
                     children: [
-                      Text('Direct Bank & UPI Settlement', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text('A/C: •••• 4756 · IFSC: SBIN0000001 · ram@upi', style: AppTextStyles.caption),
+                      const Icon(Icons.account_balance, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Direct Bank & UPI Settlement', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text(
+                              _profileData?['bank_account'] != null
+                                  ? 'A/C: ${_profileData!['bank_account']} · IFSC: ${_profileData?['ifsc_code'] ?? 'N/A'}'
+                                  : 'Tap to configure Bank & UPI payouts',
+                              style: AppTextStyles.caption,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: AppColors.textDisabled),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.textDisabled),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Exhibition Registrations
-          AppCard(
-            onTap: () => context.push('/artisan/exhibitions'),
-            child: Row(
-              children: [
-                const Icon(Icons.event_seat, color: AppColors.primary, size: 24),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 12),
+                // CSV Report Download Card
+                AppCard(
+                  onTap: _downloadReport,
+                  child: Row(
                     children: [
-                      Text('Exhibition Registrations', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text('2 Confirmed Fairs (Shilp Samagam, Dilli Haat)', style: AppTextStyles.caption),
+                      const Icon(Icons.file_download_outlined, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Download Sales & Performance CSV Report', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text('Export product analytics and buyer inquiry records', style: AppTextStyles.caption),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: AppColors.textDisabled),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.textDisabled),
+                const SizedBox(height: 12),
+                // Exhibition Registrations
+                AppCard(
+                  onTap: () => context.push('/artisan/exhibitions'),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event_seat, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Exhibition Registrations', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text('Discover Shilp Samagam, Surajkund & Dilli Haat', style: AppTextStyles.caption),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: AppColors.textDisabled),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Logout CTA
+                AppButton(
+                  label: l10n.logout,
+                  variant: AppButtonVariant.danger,
+                  icon: Icons.logout,
+                  onPressed: () async {
+                    await ref.read(authProvider.notifier).logout();
+                  },
+                ),
+                const SizedBox(height: 16),
               ],
             ),
-          ),
-          const SizedBox(height: 28),
-          // Logout CTA
-          AppButton(
-            label: l10n.logout,
-            variant: AppButtonVariant.danger,
-            icon: Icons.logout,
-            onPressed: () async {
-              await ref.read(authProvider.notifier).logout();
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStat(String value, String label) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: AppTextStyles.heading.copyWith(
-            color: AppColors.accent,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: AppTextStyles.caption.copyWith(color: Colors.white70, fontSize: 11),
-        ),
-      ],
     );
   }
 }

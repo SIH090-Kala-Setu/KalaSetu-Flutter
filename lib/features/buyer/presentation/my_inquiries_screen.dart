@@ -31,35 +31,15 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
       final history = (dashboard['inquiry_history'] as List<dynamic>?) ?? [];
       if (mounted) {
         setState(() {
-          _inquiries = history.map((json) => InquiryModel.fromJson(json)).toList();
+          _inquiries = history
+              .map((json) => InquiryModel.fromJson(json))
+              .toList();
           _isLoading = false;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _inquiries = [
-            InquiryModel(
-              id: 'bi_1',
-              productId: 'bp1',
-              buyerName: 'FabCraft Procurement',
-              buyerEmail: 'procurement@fabcraft.com',
-              quantity: 25,
-              message: 'Quotation request for 25 units of Handwoven Banarasi Katan Silk Sarees with gold zari.',
-              status: 'Responded',
-              createdAt: 'Yesterday',
-            ),
-            InquiryModel(
-              id: 'bi_2',
-              productId: 'bp2',
-              buyerName: 'FabCraft Procurement',
-              buyerEmail: 'procurement@fabcraft.com',
-              quantity: 50,
-              message: 'Inquiry for 50 Blue Glazed Terracotta planters for Bangalore store opening.',
-              status: 'Pending',
-              createdAt: '2 days ago',
-            ),
-          ];
           _isLoading = false;
         });
       }
@@ -70,9 +50,7 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('My Sent Wholesale Inquiries'),
-      ),
+      appBar: AppBar(title: const Text('My Sent Wholesale Inquiries')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
@@ -91,7 +69,9 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
                           children: [
                             Text(
                               'Order #${inq.id.substring(0, inq.id.length > 8 ? 8 : inq.id.length)}',
-                              style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
+                              style: AppTextStyles.body.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             StatusBadge(status: inq.status),
                           ],
@@ -99,7 +79,10 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
                         const SizedBox(height: 8),
                         Text(
                           inq.message ?? 'Wholesale bulk order request',
-                          style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.textPrimary),
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -107,9 +90,15 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
                           children: [
                             Text(
                               'Requested: ${inq.quantity} units',
-                              style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
+                              style: AppTextStyles.caption.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
                             ),
-                            Text(inq.createdAt ?? 'Recent', style: AppTextStyles.caption),
+                            Text(
+                              inq.createdAt ?? 'Recent',
+                              style: AppTextStyles.caption,
+                            ),
                           ],
                         ),
                       ],
@@ -121,4 +110,3 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
     );
   }
 }
-

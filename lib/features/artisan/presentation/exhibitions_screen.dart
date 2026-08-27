@@ -38,35 +38,6 @@ class _ExhibitionsScreenState extends ConsumerState<ExhibitionsScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _exhibitions = [
-            ExhibitionModel(
-              id: 'ex_1',
-              name: 'Shilp Samagam National Mela 2026',
-              location: 'Dilli Haat, INA, New Delhi',
-              status: 'Upcoming',
-              startDate: '2026-10-15',
-              endDate: '2026-10-25',
-              isRegistered: true,
-            ),
-            ExhibitionModel(
-              id: 'ex_2',
-              name: 'Surajkund International Crafts Mela',
-              location: 'Surajkund, Faridabad, Haryana',
-              status: 'Upcoming',
-              startDate: '2026-11-01',
-              endDate: '2026-11-15',
-              isRegistered: false,
-            ),
-            ExhibitionModel(
-              id: 'ex_3',
-              name: 'Gandhi Shilp Bazar Regional Expo',
-              location: 'Varanasi Trade Centre, Uttar Pradesh',
-              status: 'Ongoing',
-              startDate: '2026-08-20',
-              endDate: '2026-08-30',
-              isRegistered: true,
-            ),
-          ];
           _isLoading = false;
         });
       }

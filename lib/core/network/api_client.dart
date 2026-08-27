@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/models/user_model.dart';
 import '../../shared/models/product_model.dart';
 import '../../shared/models/inquiry_model.dart';
+import '../../shared/models/cluster_model.dart';
 import '../../shared/models/exhibition_model.dart';
 import '../../shared/models/scheme_model.dart';
 import '../../shared/models/notification_model.dart';
@@ -22,7 +23,7 @@ class ApiClient {
   ApiClient(this._dio);
 
   // ==========================================
-  // AUTH
+  // AUTH (Module 1)
   // ==========================================
 
   Future<Map<String, dynamic>> login({
@@ -75,20 +76,15 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> verifyOtp(String phone, String otp) async {
-    try {
-      final response = await _dio.post(ApiEndpoints.verifyOtp, data: {'phone': phone, 'otp': otp});
-      return response.data;
-    } catch (_) {
-      return {
-        'access_token': 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
-        'role': 'Artisan',
-        'is_registered': false,
-      };
-    }
+    final response = await _dio.post(
+      ApiEndpoints.verifyOtp,
+      data: {'phone': phone, 'otp': otp},
+    );
+    return response.data;
   }
 
   // ==========================================
-  // AI STUDIO & ENHANCEMENT
+  // AI STUDIO & ENHANCEMENT (Module 2, 3, 4)
   // ==========================================
 
   Future<Uint8List> enhanceImage(File imageFile) async {
@@ -106,6 +102,22 @@ class ApiClient {
     );
 
     return Uint8List.fromList(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> enhanceBatch(List<File> imageFiles) async {
+    final files = <MultipartFile>[];
+    for (final f in imageFiles) {
+      files.add(
+        await MultipartFile.fromFile(
+          f.path,
+          filename: f.path.split(Platform.pathSeparator).last,
+        ),
+      );
+    }
+
+    final formData = FormData.fromMap({'files': files});
+    final response = await _dio.post(ApiEndpoints.enhanceBatch, data: formData);
+    return List<Map<String, dynamic>>.from(response.data);
   }
 
   Future<ProductCatalogGenerated> generateCatalog({
@@ -132,6 +144,8 @@ class ApiClient {
   Future<PriceBreakdownModel> suggestPrice({
     required String category,
     required double materialCost,
+    double manufacturingHours = 4.0,
+    String productDescription = '',
     String? region,
     String? craftType,
   }) async {
@@ -140,6 +154,8 @@ class ApiClient {
       data: {
         'category': category,
         'material_cost': materialCost,
+        'manufacturing_hours': manufacturingHours,
+        'product_description': productDescription,
         'region': region ?? 'Uttar Pradesh',
         'craft_type': craftType ?? category,
       },
@@ -148,7 +164,7 @@ class ApiClient {
   }
 
   // ==========================================
-  // PRODUCTS
+  // PRODUCTS & INVENTORY (Module 5)
   // ==========================================
 
   Future<List<ProductModel>> getProducts({
@@ -158,12 +174,16 @@ class ApiClient {
     double? maxPrice,
   }) async {
     final queryParams = <String, dynamic>{};
-    if (craft != null && craft.isNotEmpty && craft != 'All') queryParams['craft'] = craft;
+    if (craft != null && craft.isNotEmpty && craft != 'All')
+      queryParams['craft'] = craft;
     if (state != null && state.isNotEmpty) queryParams['state'] = state;
     if (minPrice != null) queryParams['min_price'] = minPrice;
     if (maxPrice != null) queryParams['max_price'] = maxPrice;
 
-    final response = await _dio.get(ApiEndpoints.products, queryParameters: queryParams);
+    final response = await _dio.get(
+      ApiEndpoints.products,
+      queryParameters: queryParams,
+    );
     final list = response.data as List<dynamic>;
     return list.map((json) => ProductModel.fromJson(json)).toList();
   }
@@ -205,6 +225,17 @@ class ApiClient {
     return ProductModel.fromJson(response.data);
   }
 
+  Future<ProductModel> updateProduct(
+    String productId,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _dio.put(
+      ApiEndpoints.productDetail(productId),
+      data: data,
+    );
+    return ProductModel.fromJson(response.data);
+  }
+
   Future<void> updateProductStatus(String productId, String status) async {
     final formData = FormData.fromMap({'status': status});
     await _dio.put(ApiEndpoints.productStatus(productId), data: formData);
@@ -215,12 +246,32 @@ class ApiClient {
     await _dio.put(ApiEndpoints.productStock(productId), data: formData);
   }
 
+  Future<void> updateProductPrice(
+    String productId, {
+    required double basePrice,
+    double? suggestedPrice,
+  }) async {
+    final formData = FormData.fromMap({
+      'base_price': basePrice,
+      ...?suggestedPrice != null ? {'suggested_price': suggestedPrice} : null,
+    });
+    await _dio.put(ApiEndpoints.productPrice(productId), data: formData);
+  }
+
+  Future<Uint8List> getProductQr(String productId) async {
+    final response = await _dio.get(
+      ApiEndpoints.productQr(productId),
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return Uint8List.fromList(response.data);
+  }
+
   Future<void> deleteProduct(String productId) async {
     await _dio.delete(ApiEndpoints.productDetail(productId));
   }
 
   // ==========================================
-  // INQUIRIES
+  // INQUIRIES & MARKET LINKAGE (Module 6)
   // ==========================================
 
   Future<List<InquiryModel>> getInquiries() async {
@@ -255,7 +306,7 @@ class ApiClient {
   }
 
   // ==========================================
-  // NOTIFICATIONS
+  // NOTIFICATIONS (Module 8)
   // ==========================================
 
   Future<List<AppNotificationModel>> getNotifications() async {
@@ -273,7 +324,7 @@ class ApiClient {
   }
 
   // ==========================================
-  // ARTISAN
+  // ARTISAN PROFILE & ANALYTICS (Module 7 & 9)
   // ==========================================
 
   Future<Map<String, dynamic>> getArtisanDashboard() async {
@@ -296,8 +347,13 @@ class ApiClient {
     return response.data;
   }
 
+  Future<String> getArtisanReport() async {
+    final response = await _dio.get(ApiEndpoints.artisanReport);
+    return response.data.toString();
+  }
+
   // ==========================================
-  // AGGREGATOR
+  // AGGREGATOR & CLUSTERS (Module 9)
   // ==========================================
 
   Future<Map<String, dynamic>> getAggregatorDashboard() async {
@@ -360,8 +416,33 @@ class ApiClient {
     );
   }
 
+  Future<List<ClusterModel>> getClusters() async {
+    final response = await _dio.get(ApiEndpoints.clusters);
+    final list = response.data as List<dynamic>;
+    return list.map((json) => ClusterModel.fromJson(json)).toList();
+  }
+
+  Future<List<ClusterModel>> getMyClusters() async {
+    final response = await _dio.get(ApiEndpoints.myClusters);
+    final list = response.data as List<dynamic>;
+    return list.map((json) => ClusterModel.fromJson(json)).toList();
+  }
+
+  Future<List<UserModel>> getClusterArtisans(String clusterId) async {
+    final response = await _dio.get(ApiEndpoints.clusterArtisans(clusterId));
+    final list = response.data as List<dynamic>;
+    return list.map((json) => UserModel.fromJson(json)).toList();
+  }
+
+  Future<void> addArtisanToCluster(String clusterId, String artisanId) async {
+    await _dio.post(
+      ApiEndpoints.clusterArtisans(clusterId),
+      data: {'artisan_id': artisanId},
+    );
+  }
+
   // ==========================================
-  // BUYER
+  // BUYER (Module 6 & 9)
   // ==========================================
 
   Future<Map<String, dynamic>> getBuyerDashboard() async {
@@ -370,7 +451,7 @@ class ApiClient {
   }
 
   // ==========================================
-  // EXHIBITIONS & SCHEMES
+  // EXHIBITIONS & SCHEMES (Module 6 & 8)
   // ==========================================
 
   Future<List<ExhibitionModel>> getExhibitions() async {

@@ -1,30 +1,6 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
-migrate_working_dir/
-Thumbs.db
-.env
-.env.*
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# Visual Studio Code related
-.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ==============================================================================
+# Flutter / Dart / Pub
+# ==============================================================================
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -32,17 +8,27 @@ Thumbs.db
 .pub-cache/
 .pub/
 /build/
-
-# Symbol processing related
-symbols/
-
-# Output of the flutter build command
 build/
 
-# Android Studio will create this file on sync
-local.properties
+# Generated localizations / assets
+**/doc/api/
+symbols/
 
-# Android specific
+# ==============================================================================
+# Environment Variables & Secrets
+# ==============================================================================
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# ==============================================================================
+# Android Specific
+# ==============================================================================
 android/.gradle/
 android/captures/
 android/gradlew
@@ -52,8 +38,12 @@ android/**/GeneratedPluginRegistrant.java
 android/key.properties
 *.jks
 *.keystore
+*.apk
+*.aab
 
-# iOS/XCode specific
+# ==============================================================================
+# iOS / Xcode Specific
+# ==============================================================================
 ios/Flutter/App.framework
 ios/Flutter/Flutter.framework
 ios/Flutter/Flutter.podspec
@@ -76,7 +66,61 @@ ios/.symlinks/
 ios/profile/
 ios/release/
 
-# Coverage
+# ==============================================================================
+# Windows Specific
+# ==============================================================================
+windows/flutter/ephemeral/
+*.exe
+*.dll
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.suo
+*.user
+*.sln.docstates
+
+# ==============================================================================
+# macOS & Linux Specific
+# ==============================================================================
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==============================================================================
+# IDEs & Code Editors
+# ==============================================================================
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.atom/
+.history
+.buildlog/
+.svn/
+
+# ==============================================================================
+# Miscellaneous & Temp Files
+# ==============================================================================
+*.class
+*.log
+*.pyc
+*.pyo
+__pycache__/
+*.swp
+*.bak
+*~
+*.tmp
+*.temp
+migrate_working_dir/
 coverage/
 
 # Exceptions

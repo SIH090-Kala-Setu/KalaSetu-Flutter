@@ -33,7 +33,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final password = _passwordController.text.trim();
 
     if (username.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your username/phone and password');
+      setState(
+        () => _errorMessage = 'Please enter your username/phone and password',
+      );
       return;
     }
 
@@ -50,12 +52,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final role = res['role'] ?? 'Artisan';
       final name = res['username'] ?? username;
 
-      await ref.read(authProvider.notifier).loginWithSession(
-        token: token,
-        role: role,
-        fullName: name,
-        phone: username,
-      );
+      await ref
+          .read(authProvider.notifier)
+          .loginWithSession(
+            token: token,
+            role: role,
+            fullName: name,
+            phone: username,
+          );
 
       if (mounted) {
         if (role == 'Aggregator') {
@@ -67,26 +71,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
     } catch (e) {
-      // Mock fallback for rapid testing if backend offline
-      String role = 'Artisan';
-      if (username.toLowerCase().contains('aggregator')) role = 'Aggregator';
-      if (username.toLowerCase().contains('buyer')) role = 'Buyer';
-
-      await ref.read(authProvider.notifier).loginWithSession(
-        token: 'token_mock_${DateTime.now().millisecondsSinceEpoch}',
-        role: role,
-        fullName: username,
-        phone: username,
-      );
-
       if (mounted) {
-        if (role == 'Aggregator') {
-          context.go('/aggregator/home');
-        } else if (role == 'Buyer') {
-          context.go('/buyer/home');
-        } else {
-          context.go('/artisan/home');
-        }
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -155,7 +143,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   },
                   child: Text(
                     "Don't have an account? Register",
-                    style: AppTextStyles.button.copyWith(color: AppColors.accent),
+                    style: AppTextStyles.button.copyWith(
+                      color: AppColors.accent,
+                    ),
                   ),
                 ),
               ),
@@ -166,4 +156,3 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
-

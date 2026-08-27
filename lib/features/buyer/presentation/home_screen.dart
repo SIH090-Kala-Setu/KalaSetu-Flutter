@@ -6,6 +6,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/network/api_client.dart';
 import '../../../shared/models/product_model.dart';
 import '../../../shared/widgets/shimmer_loader.dart';
+import '../../../shared/widgets/product_thumbnail.dart';
 
 class BuyerHomeScreen extends ConsumerStatefulWidget {
   const BuyerHomeScreen({super.key});
@@ -54,56 +55,6 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _products = [
-            ProductModel(
-              id: 'bp1',
-              titleEn: 'Handwoven Banarasi Katan Silk Saree',
-              titleHi: 'बनारसी कातन सिल्क साड़ी',
-              category: 'Textiles & Handloom',
-              retailPrice: 5800,
-              b2bPrice: 4200,
-              stock: 25,
-              status: 'Active',
-              artisanName: 'Ramesh Chandra Weaver',
-              artisanCoop: 'Varanasi Silk Weaver Cluster',
-            ),
-            ProductModel(
-              id: 'bp2',
-              titleEn: 'Traditional Blue Glazed Terracotta Planter',
-              titleHi: 'नीला मिट्टी का गमला',
-              category: 'Clay & Pottery',
-              retailPrice: 1200,
-              b2bPrice: 750,
-              stock: 50,
-              status: 'Active',
-              artisanName: 'Kailash Potter',
-              artisanCoop: 'Jaipur Blue Pottery Cluster',
-            ),
-            ProductModel(
-              id: 'bp3',
-              titleEn: 'Silver Filigree Cuttack Peacock Brooch',
-              titleHi: 'चांदी की मोर ब्रोच',
-              category: 'Jewelry & Silver',
-              retailPrice: 3800,
-              b2bPrice: 2800,
-              stock: 15,
-              status: 'Active',
-              artisanName: 'Debendra Sahoo',
-              artisanCoop: 'Cuttack Silver Artisans Society',
-            ),
-            ProductModel(
-              id: 'bp4',
-              titleEn: 'Sheesham Wood Inlay Jewellery Box',
-              titleHi: 'शीशम की लकड़ी का बॉक्स',
-              category: 'Woodwork & Inlay',
-              retailPrice: 1950,
-              b2bPrice: 1350,
-              stock: 30,
-              status: 'Active',
-              artisanName: 'Mohd. Imran',
-              artisanCoop: 'Saharanpur Woodcraft Guild',
-            ),
-          ];
           _isLoading = false;
         });
       }
@@ -113,7 +64,8 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
   List<ProductModel> get _filteredProducts {
     final query = _searchController.text.trim().toLowerCase();
     return _products.where((p) {
-      final matchesQuery = p.titleEn.toLowerCase().contains(query) ||
+      final matchesQuery =
+          p.titleEn.toLowerCase().contains(query) ||
           p.titleHi.toLowerCase().contains(query) ||
           (p.artisanName?.toLowerCase().contains(query) ?? false);
       if (!matchesQuery) return false;
@@ -134,7 +86,11 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
             icon: const Icon(Icons.tune),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Filter by state, price bracket, and MoSJE badge')),
+                const SnackBar(
+                  content: Text(
+                    'Filter by state, price bracket, and MoSJE badge',
+                  ),
+                ),
               );
             },
           ),
@@ -160,7 +116,10 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -176,8 +135,12 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                           selected: isSelected,
                           selectedColor: AppColors.primary,
                           labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : AppColors.textPrimary,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textPrimary,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                           onSelected: (val) {
                             if (val) {
@@ -202,12 +165,13 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                   )
                 : GridView.builder(
                     padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: 0.68,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          childAspectRatio: 0.68,
+                        ),
                     itemCount: _filteredProducts.length,
                     itemBuilder: (context, index) {
                       final p = _filteredProducts[index];
@@ -232,15 +196,14 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Product Thumbnail
                               Expanded(
                                 child: ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                  child: Container(
-                                    color: AppColors.primary.withValues(alpha: 0.06),
-                                    child: const Center(
-                                      child: Icon(Icons.shopping_bag_outlined, size: 48, color: AppColors.primary),
-                                    ),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(12),
+                                  ),
+                                  child: ProductThumbnail(
+                                    imageUrl: p.imageUrl,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
                               ),
@@ -260,7 +223,8 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      p.artisanName ?? 'Verified Master Artisan',
+                                      p.artisanName ??
+                                          'Verified Master Artisan',
                                       style: AppTextStyles.caption.copyWith(
                                         fontSize: 11,
                                         color: AppColors.textSecondary,
@@ -281,14 +245,19 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                                         const SizedBox(width: 4),
                                         Text(
                                           'B2B Wholesale',
-                                          style: AppTextStyles.caption.copyWith(fontSize: 10, color: AppColors.success),
+                                          style: AppTextStyles.caption.copyWith(
+                                            fontSize: 10,
+                                            color: AppColors.success,
+                                          ),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       'Min Order: 10 units',
-                                      style: AppTextStyles.caption.copyWith(fontSize: 10),
+                                      style: AppTextStyles.caption.copyWith(
+                                        fontSize: 10,
+                                      ),
                                     ),
                                   ],
                                 ),

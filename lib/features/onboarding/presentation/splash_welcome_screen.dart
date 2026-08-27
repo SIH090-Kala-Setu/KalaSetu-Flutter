@@ -3,10 +3,67 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/l10n/app_localizations.dart';
+import '../../../core/network/api_endpoints.dart';
 import '../../../shared/widgets/app_button.dart';
 
 class SplashWelcomeScreen extends StatelessWidget {
   const SplashWelcomeScreen({super.key});
+
+  void _showServerSettings(BuildContext context) {
+    final controller = TextEditingController(text: ApiEndpoints.baseUrl);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Backend API Server'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Configure the FastAPI PostgreSQL backend URL:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Server Base URL',
+                  hintText: 'http://127.0.0.1:8000',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '• Desktop / Web: http://127.0.0.1:8000\n• Android Emulator: http://10.0.2.2:8000\n• Physical Device: http://<PC-LAN-IP>:8000',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final url = controller.text.trim();
+                if (url.isNotEmpty) {
+                  ApiEndpoints.setBaseUrl(url);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Connected to backend at $url')),
+                  );
+                }
+              },
+              child: const Text('Save & Reconnect'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,9 +71,20 @@ class SplashWelcomeScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
+            tooltip: 'Configure Backend Server',
+            onPressed: () => _showServerSettings(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -131,4 +199,3 @@ class SplashWelcomeScreen extends StatelessWidget {
     );
   }
 }
-

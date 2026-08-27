@@ -1,8 +1,35 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 class ApiEndpoints {
   ApiEndpoints._();
 
-  static const String baseUrl =
-      'http://10.0.2.2:8000'; // Standard Android emulator localhost; override for physical device or web
+  static String _overrideBaseUrl = '';
+
+  /// Allows setting a custom backend URL at runtime (e.g., from settings or env)
+  static void setBaseUrl(String url) {
+    _overrideBaseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+  }
+
+  /// Dynamically resolves the active FastAPI backend base URL
+  static String get baseUrl {
+    if (_overrideBaseUrl.isNotEmpty) {
+      return _overrideBaseUrl;
+    }
+    if (kIsWeb) {
+      return 'http://localhost:8000';
+    }
+    try {
+      if (Platform.isAndroid) {
+        // In Android Emulator, 10.0.2.2 points to host PC localhost:8000.
+        // For physical device, use adb reverse or LAN IP.
+        return 'http://10.0.2.2:8000';
+      }
+    } catch (_) {}
+
+    // Windows, macOS, Linux, iOS
+    return 'http://127.0.0.1:8000';
+  }
 
   // Auth
   static const String register = '/auth/register';

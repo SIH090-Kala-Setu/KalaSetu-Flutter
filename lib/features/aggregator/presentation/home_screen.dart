@@ -36,39 +36,19 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
     try {
       final apiClient = ref.read(apiClientProvider);
       final data = await apiClient.getAggregatorDashboard();
+      final artisans = await apiClient.getAggregatorArtisans();
       if (mounted) {
         setState(() {
-          _totalArtisans = data['total_artisans'] ?? 48;
-          _activeListings = data['total_active_listings'] ?? 112;
-          _inquiriesThisMonth = data['total_pending_inquiries'] ?? 34;
+          _totalArtisans = data['total_artisans'] ?? artisans.length;
+          _activeListings = data['total_active_listings'] ?? 0;
+          _inquiriesThisMonth = data['total_pending_inquiries'] ?? 0;
+          _unlistedArtisans = artisans.where((a) => !a.isVerified).toList();
           _isLoading = false;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _unlistedArtisans = [
-            UserModel(
-              id: 'a1',
-              username: 'ganesh_weaver',
-              fullName: 'Ganesh Devangan',
-              phoneNumber: '9876543211',
-              role: 'Artisan',
-              state: 'Gujarat',
-              district: 'Patan',
-              isVerified: true,
-            ),
-            UserModel(
-              id: 'a2',
-              username: 'savita_potter',
-              fullName: 'Savita Ben',
-              phoneNumber: '9876543212',
-              role: 'Artisan',
-              state: 'Gujarat',
-              district: 'Kutch',
-              isVerified: false,
-            ),
-          ];
           _isLoading = false;
         });
       }

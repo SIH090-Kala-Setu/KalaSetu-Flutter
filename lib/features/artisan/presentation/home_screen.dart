@@ -35,41 +35,21 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
     try {
       final apiClient = ref.read(apiClientProvider);
       final data = await apiClient.getArtisanDashboard();
+      final inqs = await apiClient.getInquiries();
 
       if (mounted) {
         setState(() {
-          _activeListings = data['active_listings'] ?? 12;
-          _pendingInquiries = data['pending_inquiries'] ?? 3;
-          _totalViews = data['total_views'] ?? 184;
-          _estIncome = (data['revenue_estimate'] ?? 24500.0).toDouble();
+          _activeListings = data['active_listings'] ?? 0;
+          _pendingInquiries = data['pending_inquiries'] ?? 0;
+          _totalViews = data['total_views'] ?? 0;
+          _estIncome = (data['revenue_estimate'] ?? 0.0).toDouble();
+          _recentInquiries = inqs.take(3).toList();
           _isLoading = false;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _recentInquiries = [
-            InquiryModel(
-              id: 'inq_1',
-              productId: 'prod_1',
-              buyerName: 'FabIndia Retail Ltd',
-              buyerEmail: 'procurement@fabindia.com',
-              quantity: 50,
-              message: 'Looking for 50 pieces of Banarasi Handloom Scarves for upcoming festive season.',
-              status: 'Pending',
-              createdAt: '2 hours ago',
-            ),
-            InquiryModel(
-              id: 'inq_2',
-              productId: 'prod_2',
-              buyerName: 'Craftsvilla Exports',
-              buyerEmail: 'orders@craftsvilla.com',
-              quantity: 20,
-              message: 'Custom terracotta blue pottery vase requirement.',
-              status: 'Responded',
-              createdAt: '1 day ago',
-            ),
-          ];
           _isLoading = false;
         });
       }
@@ -97,7 +77,10 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
               child: const Icon(Icons.palette, size: 20, color: Colors.black87),
             ),
             const SizedBox(width: 10),
-            Text('कलाSetu', style: AppTextStyles.heading.copyWith(fontSize: 22)),
+            Text(
+              'कलाSetu',
+              style: AppTextStyles.heading.copyWith(fontSize: 22),
+            ),
           ],
         ),
         actions: [
@@ -118,7 +101,10 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18.0,
+                vertical: 12.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -130,31 +116,42 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                   const SizedBox(height: 12),
                   // Verification Banner
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: isVerified
                           ? AppColors.success.withValues(alpha: 0.1)
                           : AppColors.warning.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isVerified ? AppColors.success : const Color(0xFFD68910),
+                        color: isVerified
+                            ? AppColors.success
+                            : const Color(0xFFD68910),
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           isVerified ? Icons.verified : Icons.hourglass_top,
-                          color: isVerified ? AppColors.success : const Color(0xFFD68910),
+                          color: isVerified
+                              ? AppColors.success
+                              : const Color(0xFFD68910),
                           size: 24,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            isVerified ? l10n.verifiedArtisan : l10n.verificationPending,
+                            isVerified
+                                ? l10n.verifiedArtisan
+                                : l10n.verificationPending,
                             style: AppTextStyles.body.copyWith(
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
-                              color: isVerified ? AppColors.success : const Color(0xFFB9770E),
+                              color: isVerified
+                                  ? AppColors.success
+                                  : const Color(0xFFB9770E),
                             ),
                           ),
                         ),
@@ -180,14 +177,19 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'This Month',
-                                style: AppTextStyles.caption.copyWith(color: Colors.white),
+                                style: AppTextStyles.caption.copyWith(
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ],
@@ -206,12 +208,17 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                           children: [
                             Text(
                               '$_activeListings Active Products',
-                              style: AppTextStyles.caption.copyWith(color: AppColors.accent, fontWeight: FontWeight.bold),
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Text(
                               '$_totalViews Catalog Views',
-                              style: AppTextStyles.caption.copyWith(color: Colors.white70),
+                              style: AppTextStyles.caption.copyWith(
+                                color: Colors.white70,
+                              ),
                             ),
                           ],
                         ),
@@ -220,7 +227,10 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                   ),
                   const SizedBox(height: 20),
                   // 2x2 Quick Action Grid
-                  Text(l10n.quickActions, style: AppTextStyles.heading.copyWith(fontSize: 18)),
+                  Text(
+                    l10n.quickActions,
+                    style: AppTextStyles.heading.copyWith(fontSize: 18),
+                  ),
                   const SizedBox(height: 12),
                   GridView.count(
                     shrinkWrap: true,
@@ -284,7 +294,11 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.campaign, color: AppColors.accent, size: 32),
+                        const Icon(
+                          Icons.campaign,
+                          color: AppColors.accent,
+                          size: 32,
+                        ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
@@ -316,60 +330,78 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(l10n.recentInquiries, style: AppTextStyles.heading.copyWith(fontSize: 18)),
+                      Text(
+                        l10n.recentInquiries,
+                        style: AppTextStyles.heading.copyWith(fontSize: 18),
+                      ),
                       TextButton(
                         onPressed: () {
                           context.go('/artisan/inquiries');
                         },
-                        child: Text(l10n.viewAll, style: AppTextStyles.button.copyWith(color: AppColors.accent)),
+                        child: Text(
+                          l10n.viewAll,
+                          style: AppTextStyles.button.copyWith(
+                            color: AppColors.accent,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  ..._recentInquiries.map((inq) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10.0),
-                        child: AppCard(
-                          onTap: () {
-                            context.go('/artisan/inquiries');
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    inq.buyerName,
-                                    style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+                  ..._recentInquiries.map(
+                    (inq) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10.0),
+                      child: AppCard(
+                        onTap: () {
+                          context.go('/artisan/inquiries');
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  inq.buyerName,
+                                  style: AppTextStyles.body.copyWith(
+                                    fontWeight: FontWeight.w700,
                                   ),
-                                  StatusBadge(status: inq.status),
-                                ],
+                                ),
+                                StatusBadge(status: inq.status),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              inq.message ?? 'Bulk order inquiry',
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 13,
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                inq.message ?? 'Bulk order inquiry',
-                                style: AppTextStyles.caption.copyWith(fontSize: 13),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Quantity: ${inq.quantity} units',
-                                    style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Quantity: ${inq.quantity} units',
+                                  style: AppTextStyles.caption.copyWith(
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  Text(
-                                    inq.createdAt ?? 'Recent',
-                                    style: AppTextStyles.caption.copyWith(fontSize: 11),
+                                ),
+                                Text(
+                                  inq.createdAt ?? 'Recent',
+                                  style: AppTextStyles.caption.copyWith(
+                                    fontSize: 11,
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      )),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -407,7 +439,9 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                   style: AppTextStyles.body.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
-                    color: iconColor == Colors.black87 ? Colors.black87 : AppColors.textPrimary,
+                    color: iconColor == Colors.black87
+                        ? Colors.black87
+                        : AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -417,14 +451,21 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                 top: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.accent,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     badge,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
               ),

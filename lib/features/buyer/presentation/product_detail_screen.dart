@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/network/api_client.dart';
+import '../../../shared/models/product_model.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/product_thumbnail.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -18,12 +20,38 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   bool _isHindi = false;
-  int _quantity = 25;
+  int _quantity = 10;
   bool _isSubmitting = false;
+  bool _isLoading = true;
+  ProductModel? _product;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProduct();
+  }
+
+  void _fetchProduct() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final p = await apiClient.getProductDetail(widget.productId);
+      if (mounted) {
+        setState(() {
+          _product = p;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   void _showInquirySheet() {
+    final title = _product?.titleEn ?? 'Product';
     final messageController = TextEditingController(
-      text: 'I am interested in procuring $_quantity units for our retail chain. Please share wholesale lead time and custom packaging options.',
+      text: 'I am interested in procuring $_quantity units of $title for our retail chain. Please share wholesale lead time and logistics details.',
     );
 
     showModalBottomSheet(
@@ -49,7 +77,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 children: [
                   Text('Submit B2B Bulk Inquiry', style: AppTextStyles.heading.copyWith(fontSize: 18)),
                   const SizedBox(height: 8),
-                  Text('Direct message to verified artisan cooperative.', style: AppTextStyles.caption),
+                  Text('Direct quotation request to the verified artisan cooperative.', style: AppTextStyles.caption),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -60,8 +88,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline),
                             onPressed: () {
-                              if (_quantity > 5) {
-                                setSheetState(() => _quantity -= 5);
+                              if (_quantity > 1) {
+                                setSheetState(() => _quantity -= 1);
                               }
                             },
                           ),
@@ -69,7 +97,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           IconButton(
                             icon: const Icon(Icons.add_circle_outline),
                             onPressed: () {
-                              setSheetState(() => _quantity += 5);
+                              setSheetState(() => _quantity += 1);
                             },
                           ),
                         ],
@@ -80,7 +108,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   TextField(
                     controller: messageController,
                     maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Inquiry Message'),
+                    decoration: const InputDecoration(labelText: 'Inquiry Message / Requirements'),
                   ),
                   const SizedBox(height: 20),
                   AppButton(
@@ -88,14 +116,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     isLoading: _isSubmitting,
                     onPressed: () async {
                       setSheetState(() => _isSubmitting = true);
-                      final apiClient = ref.read(apiClientProvider);
-                      await apiClient.createInquiry(
-                        productId: widget.productId,
-                        buyerName: 'FabCraft Procurement',
-                        buyerEmail: 'procurement@fabcraft.com',
-                        quantity: _quantity,
-                        notes: messageController.text.trim(),
-                      );
+                      try {
+                        final apiClient = ref.read(apiClientProvider);
+                        await apiClient.createInquiry(
+                          productId: widget.productId,
+                          buyerName: 'Enterprise Buyer',
+                          buyerEmail: 'procurement@kala.gov.in',
+                          quantity: _quantity,
+                          notes: messageController.text.trim(),
+                        );
+                      } catch (_) {}
                       setSheetState(() => _isSubmitting = false);
                       if (!context.mounted) return;
                       Navigator.pop(context);
@@ -118,6 +148,20 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Product Details')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final p = _product;
+    final title = _isHindi ? (p?.titleHi.isNotEmpty == true ? p!.titleHi : p?.titleEn ?? 'शिल्प') : (p?.titleEn ?? 'Product');
+    final desc = _isHindi ? (p?.descriptionHi?.isNotEmpty == true ? p!.descriptionHi : p?.descriptionEn ?? '') : (p?.descriptionEn ?? '');
+    final retailPrice = p?.retailPrice ?? 0.0;
+    final b2bPrice = p?.b2bPrice ?? (retailPrice * 0.85);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -153,11 +197,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Full Width Product Image Box
-            Container(
-              height: 300,
-              color: AppColors.primary.withValues(alpha: 0.08),
-              child: const Center(
-                child: Icon(Icons.shopping_bag_outlined, size: 100, color: AppColors.primary),
+            SizedBox(
+              height: 320,
+              width: double.infinity,
+              child: ProductThumbnail(
+                imageUrl: p?.imageUrl,
+                fit: BoxFit.contain,
               ),
             ),
             Padding(
@@ -167,7 +212,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 children: [
                   // Title
                   Text(
-                    _isHindi ? 'हथकरघा बनारसी कातन सिल्क साड़ी' : 'Handwoven Banarasi Katan Silk Saree',
+                    title,
                     style: AppTextStyles.display.copyWith(fontSize: 22),
                   ),
                   const SizedBox(height: 12),
@@ -175,7 +220,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   Row(
                     children: [
                       Text(
-                        '₹ 4,200',
+                        '₹ ${b2bPrice.toStringAsFixed(0)}',
                         style: AppTextStyles.display.copyWith(
                           color: AppColors.primary,
                           fontSize: 26,
@@ -183,52 +228,65 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '₹ 5,800 (Retail)',
-                        style: AppTextStyles.caption.copyWith(
-                          decoration: TextDecoration.lineThrough,
-                          fontSize: 14,
+                      if (retailPrice > b2bPrice) ...[
+                        Text(
+                          '₹ ${retailPrice.toStringAsFixed(0)} (Retail)',
+                          style: AppTextStyles.caption.copyWith(
+                            decoration: TextDecoration.lineThrough,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${(((retailPrice - b2bPrice) / retailPrice) * 100).toStringAsFixed(0)}% B2B Margin',
+                            style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
                         ),
-                        child: const Text(
-                          '28% B2B Margin',
-                          style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 11),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Tags
+                  // Materials & Tags
                   Wrap(
                     spacing: 8,
-                    children: const [
-                      Chip(label: Text('Pure Silk', style: TextStyle(fontSize: 12))),
-                      Chip(label: Text('Zari Brocade', style: TextStyle(fontSize: 12))),
-                      Chip(label: Text('Varanasi GI Tagged', style: TextStyle(fontSize: 12))),
-                      Chip(label: Text('MoSJE Certified', style: TextStyle(fontSize: 12))),
+                    runSpacing: 6,
+                    children: [
+                      Chip(
+                        label: Text(p?.category ?? 'Handicrafts', style: const TextStyle(fontSize: 12)),
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                      ),
+                      if (p?.materials != null)
+                        ...p!.materials.map((m) => Chip(
+                              label: Text(m, style: const TextStyle(fontSize: 12)),
+                              backgroundColor: AppColors.accent.withValues(alpha: 0.15),
+                            )),
+                      if (p?.tags != null)
+                        ...p!.tags.map((t) => Chip(
+                              label: Text(t, style: const TextStyle(fontSize: 12)),
+                              backgroundColor: Colors.black.withValues(alpha: 0.05),
+                            )),
                     ],
                   ),
                   const SizedBox(height: 20),
                   // Description
-                  Text(
-                    _isHindi ? 'विवरण' : 'Story & Description',
-                    style: AppTextStyles.heading.copyWith(fontSize: 16),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _isHindi
-                        ? 'यह बनारसी कातन साड़ी वाराणसी के पारंपरिक बुनकरों द्वारा शुद्ध शहतूत रेशम और सोने की ज़री से तैयार की गई है।'
-                        : 'Authentic pure mulberry silk handwoven Banarasi saree with intricate gold zari brocade motifs woven on traditional wooden pit looms.',
-                    style: AppTextStyles.body.copyWith(height: 1.5, fontSize: 14),
-                  ),
-                  const SizedBox(height: 24),
+                  if (desc != null && desc.isNotEmpty) ...[
+                    Text(
+                      _isHindi ? 'विवरण' : 'Story & Description',
+                      style: AppTextStyles.heading.copyWith(fontSize: 16),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      desc,
+                      style: AppTextStyles.body.copyWith(height: 1.5, fontSize: 14),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                   // Master Artisan Card
                   Text('Artisan & Cluster Credentials', style: AppTextStyles.heading.copyWith(fontSize: 16)),
                   const SizedBox(height: 10),
@@ -248,7 +306,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                               Row(
                                 children: [
                                   Text(
-                                    'Ramesh Chandra Weaver',
+                                    p?.artisanName ?? 'Master Karigar',
                                     style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(width: 6),
@@ -256,8 +314,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                 ],
                               ),
                               const SizedBox(height: 2),
-                              Text('Varanasi Silk Weaver Cooperative', style: AppTextStyles.caption),
-                              Text('MoSJE Beneficiary · 28 Yrs Experience', style: AppTextStyles.caption.copyWith(color: AppColors.accent)),
+                              Text(p?.artisanCoop ?? 'Independent Cooperative', style: AppTextStyles.caption),
+                              Text('MoSJE Registered Artisan', style: AppTextStyles.caption.copyWith(color: AppColors.accent)),
                             ],
                           ),
                         ),

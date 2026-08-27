@@ -51,48 +51,6 @@ class _AggregatorArtisansListScreenState
     } catch (_) {
       if (mounted) {
         setState(() {
-          _artisans = [
-            UserModel(
-              id: 'a1',
-              username: 'ramesh_pune',
-              fullName: 'Ramesh Chandra Weaver',
-              phoneNumber: '9876543210',
-              role: 'Artisan',
-              state: 'Gujarat',
-              district: 'Patan',
-              isVerified: true,
-            ),
-            UserModel(
-              id: 'a2',
-              username: 'savita_ben',
-              fullName: 'Savita Ben Ikat',
-              phoneNumber: '9876543212',
-              role: 'Artisan',
-              state: 'Gujarat',
-              district: 'Patan',
-              isVerified: false,
-            ),
-            UserModel(
-              id: 'a3',
-              username: 'mohan_lal',
-              fullName: 'Mohan Lal Master Weaver',
-              phoneNumber: '9876543214',
-              role: 'Artisan',
-              state: 'Gujarat',
-              district: 'Patan',
-              isVerified: true,
-            ),
-            UserModel(
-              id: 'a4',
-              username: 'kailash_kumar',
-              fullName: 'Kailash Kumar Devangan',
-              phoneNumber: '9876543216',
-              role: 'Artisan',
-              state: 'Gujarat',
-              district: 'Patan',
-              isVerified: false,
-            ),
-          ];
           _isLoading = false;
         });
       }

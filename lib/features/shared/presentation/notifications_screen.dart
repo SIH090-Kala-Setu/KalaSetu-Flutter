@@ -10,7 +10,8 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
@@ -36,29 +37,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _notifications = [
-            AppNotificationModel(
-              id: 'n1',
-              title: 'New Bulk Order Inquiry',
-              message: 'FabIndia has submitted an RFQ for 50 pieces of Banarasi Handloom Scarves.',
-              type: 'Inquiry',
-              sentAt: '2 hours ago',
-            ),
-            AppNotificationModel(
-              id: 'n2',
-              title: 'Government Scheme Alert',
-              message: 'PM Vishwakarma ₹15,000 modern toolkits disbursement is now open for your cluster.',
-              type: 'Scheme',
-              sentAt: 'Yesterday',
-            ),
-            AppNotificationModel(
-              id: 'n3',
-              title: 'Exhibition Stall Confirmed',
-              message: 'Your stall application for Shilp Samagam 2026 at Dilli Haat has been approved by MoSJE.',
-              type: 'Verification',
-              sentAt: '2 days ago',
-            ),
-          ];
           _isLoading = false;
         });
       }
@@ -80,7 +58,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               await apiClient.markAllNotificationsRead();
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('All notifications marked as read')),
+                const SnackBar(
+                  content: Text('All notifications marked as read'),
+                ),
               );
             },
           ),
@@ -123,14 +103,27 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(notif.title, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
+                              Text(
+                                notif.title,
+                                style: AppTextStyles.body.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 notif.message,
-                                style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.textPrimary),
+                                style: AppTextStyles.caption.copyWith(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                               const SizedBox(height: 6),
-                              Text(notif.sentAt ?? 'Recent', style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                              Text(
+                                notif.sentAt ?? 'Recent',
+                                style: AppTextStyles.caption.copyWith(
+                                  fontSize: 11,
+                                ),
+                              ),
                             ],
                           ),
                         ),
