@@ -147,7 +147,7 @@ class _LanguagePickerScreenState extends ConsumerState<LanguagePickerScreen> {
               AppButton(
                 label: l10n.continueButton,
                 onPressed: () {
-                  context.push('/onboarding/register');
+                  context.push('/onboarding/welcome');
                 },
               ),
               const SizedBox(height: 8),

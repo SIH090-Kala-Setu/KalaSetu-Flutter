@@ -179,7 +179,7 @@ class SplashWelcomeScreen extends StatelessWidget {
               AppButton(
                 label: l10n.iAmNewHere,
                 onPressed: () {
-                  context.push('/onboarding/role');
+                  context.push('/onboarding/register');
                 },
               ),
               const SizedBox(height: 12),

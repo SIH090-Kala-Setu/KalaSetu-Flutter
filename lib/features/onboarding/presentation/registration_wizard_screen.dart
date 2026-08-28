@@ -69,7 +69,7 @@ class RegistrationWizardScreen extends ConsumerStatefulWidget {
 }
 
 class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScreen> {
-  int _step = 1;
+  int _step = 2;
   static const int _totalSteps = 7; // visible numbered steps (not counting success)
 
   
@@ -173,7 +173,7 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
     _error = null;
     if (_step == 6) {
       setState(() => _step = _role == 'Artisan' ? 5 : 4);
-    } else if (_step > 1) {
+    } else if (_step > 2) {
       setState(() => _step--);
     } else {
       context.pop();
