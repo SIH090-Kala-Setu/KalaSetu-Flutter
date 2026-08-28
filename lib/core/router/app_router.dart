@@ -14,6 +14,7 @@ import '../../features/onboarding/presentation/artisan_registration_wizard.dart'
 import '../../features/onboarding/presentation/aggregator_registration_screen.dart';
 import '../../features/onboarding/presentation/buyer_registration_screen.dart';
 import '../../features/onboarding/presentation/pending_verification_screen.dart';
+import '../../features/onboarding/presentation/registration_wizard_screen.dart';
 
 // Auth
 import '../../features/auth/presentation/login_screen.dart';
@@ -142,6 +143,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding/pending-verification',
         builder: (context, state) => const PendingVerificationScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/register',
+        builder: (context, state) => const RegistrationWizardScreen(),
       ),
       GoRoute(
         path: '/login',

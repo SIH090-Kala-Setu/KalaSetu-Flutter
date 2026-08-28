@@ -139,7 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Center(
                 child: TextButton(
                   onPressed: () {
-                    context.push('/onboarding/role');
+                    context.push('/onboarding/language');
                   },
                   child: Text(
                     "Don't have an account? Register",

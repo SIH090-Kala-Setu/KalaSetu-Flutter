@@ -448,6 +448,39 @@ class ApiClient {
     );
   }
 
+  Future<List<ClusterModel>> getClustersUnassigned() async {
+    final response = await _dio.get(ApiEndpoints.clusters, queryParameters: {'unassigned': true});
+    final list = response.data as List<dynamic>;
+    return list.map((json) => ClusterModel.fromJson(json)).toList();
+  }
+
+  Future<Map<String, dynamic>> joinCluster(String clusterId) async {
+    final response = await _dio.post(
+      '/aggregator/join-cluster',
+      data: {'cluster_id': clusterId},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<ClusterModel> createCluster({
+    required String clusterName,
+    required String state,
+    required String district,
+    String? craftSpecialization,
+  }) async {
+    final response = await _dio.post(
+      ApiEndpoints.clusters,
+      data: {
+        'cluster_name': clusterName,
+        'state': state,
+        'district': district,
+        'craft_specialization': craftSpecialization ?? 'General Crafts',
+      },
+    );
+    return ClusterModel.fromJson(response.data);
+  }
+
+
   // ==========================================
   // BUYER (Module 6 & 9)
   // ==========================================
