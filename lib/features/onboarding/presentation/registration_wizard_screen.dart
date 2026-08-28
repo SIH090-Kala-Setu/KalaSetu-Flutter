@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -103,6 +104,25 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
   bool _submitting = false;
   String? _error;
 
+  int _resendTimer = 60;
+  Timer? _timer;
+
+  void _startResendTimer() {
+    _timer?.cancel();
+    setState(() => _resendTimer = 60);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendTimer > 0) {
+        setState(() => _resendTimer--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +135,7 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
 
   @override
   void dispose() {
+    _timer?.cancel();
     _otpCtrl.dispose();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
@@ -285,12 +306,31 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
     try {
       await ref.read(apiClientProvider).sendOtp(phone);
       setState(() { _otpSent = true; _step = 3; });
+      _startResendTimer();
     } catch (e) {
       setState(() => _error = 'Failed to send OTP.');
     } finally {
       setState(() => _submitting = false);
     }
   }
+
+  Future<void> _resendOtp() async {
+    if (_resendTimer > 0) return;
+    final phone = _phoneCtrl.text.trim();
+    if (phone.length != 10) return;
+    try {
+      await ref.read(apiClientProvider).sendOtp(phone);
+      _startResendTimer();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('OTP resent successfully')),
+        );
+      }
+    } catch (e) {
+      setState(() => _error = 'Failed to resend OTP.');
+    }
+  }
+
 
   Future<void> _verifyOtp() async {
     final otp = _otpCtrl.text.trim();
@@ -532,7 +572,17 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
           const SizedBox(height: 12),
           Text(_error!, style: AppTextStyles.caption.copyWith(color: AppColors.error)),
         ],
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
+        Center(
+          child: _resendTimer > 0
+              ? Text('Resend OTP in $_resendTimer s', style: AppTextStyles.caption)
+              : TextButton(
+                  onPressed: _resendOtp,
+                  child: Text('Resend OTP',
+                      style: AppTextStyles.button.copyWith(color: AppColors.primary, decoration: TextDecoration.underline)),
+                ),
+        ),
+        const SizedBox(height: 16),
         AppButton(
           label: 'Verify OTP',
           isLoading: _submitting,
