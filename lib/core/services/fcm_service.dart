@@ -22,9 +22,14 @@ class FcmService {
       _foregroundStream.stream;
 
   Future<void> init(WidgetRef ref) async {
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
     await _fcm.requestPermission(alert: true, badge: true, sound: true);
+
+    // On Android, set foreground notification presentation
+    await _fcm.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
     final token = await _fcm.getToken();
     if (token != null) await _uploadToken(token, ref);

@@ -51,6 +51,8 @@ class _FcmListenerState extends State<_FcmListener> {
   @override
   void initState() {
     super.initState();
+    // Initialize FCM — requests permission, gets token, uploads to backend
+    FcmService.instance.init(widget.ref);
     FcmService.onForegroundMessage.listen(_showBanner);
   }
 
