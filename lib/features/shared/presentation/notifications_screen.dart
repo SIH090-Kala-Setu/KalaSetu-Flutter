@@ -34,11 +34,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red,
+            content: Text('Failed to load notifications: ${e.toString()}'),
+          ),
+        );
       }
     }
   }
@@ -68,7 +72,27 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
+          : RefreshIndicator(
+              onRefresh: () async => _fetchNotifications(),
+              child: _notifications.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.notifications_off_outlined, size: 56, color: Colors.grey),
+                            SizedBox(height: 16),
+                            Text(
+                              'No notifications yet',
+                              style: TextStyle(fontSize: 16, color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
               padding: const EdgeInsets.all(16.0),
               itemCount: _notifications.length,
               itemBuilder: (context, index) {
@@ -133,6 +157,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 );
               },
             ),
+          ),
     );
   }
 }

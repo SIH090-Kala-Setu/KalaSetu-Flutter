@@ -8,6 +8,7 @@ import '../../../core/network/api_client.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/models/inquiry_model.dart';
+import '../../../shared/models/scheme_model.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ArtisanHomeScreen extends ConsumerStatefulWidget {
@@ -24,6 +25,7 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
   int _totalViews = 184;
   double _estIncome = 24500.0;
   List<InquiryModel> _recentInquiries = [];
+  List<GovtSchemeModel> _schemes = [];
 
   @override
   void initState() {
@@ -37,6 +39,20 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
       final data = await apiClient.getArtisanDashboard();
       final inqs = await apiClient.getInquiries();
 
+      // Fetch profile to get the live is_verified status from the backend
+      // (local cache from login time always starts as false)
+      try {
+        final profile = await apiClient.getArtisanProfile();
+        final isVerified = profile['is_verified'] == true;
+        await ref.read(authProvider.notifier).refreshUserVerification(isVerified);
+      } catch (_) {}
+
+      List<GovtSchemeModel> schemes = [];
+      try {
+        schemes = await apiClient.getSchemes();
+        schemes = schemes.where((s) => s.isActive).toList();
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _activeListings = data['active_listings'] ?? 0;
@@ -44,6 +60,7 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
           _totalViews = data['total_views'] ?? 0;
           _estIncome = (data['revenue_estimate'] ?? 0.0).toDouble();
           _recentInquiries = inqs.take(3).toList();
+          _schemes = schemes;
           _isLoading = false;
         });
       }
@@ -280,51 +297,71 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  // Govt Scheme Alert Banner
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary,
-                          AppColors.primary.withValues(alpha: 0.85),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
+                  // Govt Schemes Section
+                  if (_schemes.isNotEmpty) ...[  
+                    Text(
+                      'Government Schemes',
+                      style: AppTextStyles.heading.copyWith(fontSize: 18),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.campaign,
-                          color: AppColors.accent,
-                          size: 32,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'PM Vishwakarma Toolkit Incentive',
-                                style: AppTextStyles.body.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '₹15,000 grant for modern tools & equipment. Tap to apply.',
-                                style: AppTextStyles.caption.copyWith(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
+                    const SizedBox(height: 12),
+                    ..._schemes.map((scheme) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withValues(alpha: 0.85),
                             ],
                           ),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                      ],
-                    ),
-                  ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.campaign, color: AppColors.accent, size: 28),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    scheme.schemeName,
+                                    style: AppTextStyles.body.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    scheme.description,
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (scheme.validUntil != null) ...[  
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Valid until: ${scheme.validUntil}',
+                                      style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.accent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )),
+                  ],
                   const SizedBox(height: 24),
                   // Recent Inquiries Section
                   Row(

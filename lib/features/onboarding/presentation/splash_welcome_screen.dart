@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/network/api_client.dart';
 import '../../../shared/widgets/app_button.dart';
 
-class SplashWelcomeScreen extends StatelessWidget {
+class SplashWelcomeScreen extends ConsumerWidget {
   const SplashWelcomeScreen({super.key});
 
-  void _showServerSettings(BuildContext context) {
+  void _showServerSettings(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController(text: ApiEndpoints.baseUrl);
 
     showDialog(
@@ -48,17 +51,27 @@ class SplashWelcomeScreen extends StatelessWidget {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final url = controller.text.trim();
                 if (url.isNotEmpty) {
+                  // 1. Update the static URL immediately
                   ApiEndpoints.setBaseUrl(url);
-                  SharedPreferences.getInstance().then((prefs) {
-                    prefs.setString('custom_backend_url', url);
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Connected to backend at $url')),
-                  );
+
+                  // 2. Persist to SharedPreferences
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('custom_backend_url', url);
+
+                  // 3. Force-recreate the Dio client and ApiClient
+                  //    so any in-flight or future requests use the new URL
+                  ref.invalidate(dioProvider);
+                  ref.invalidate(apiClientProvider);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('✅ Reconnected to $url')),
+                    );
+                  }
                 }
               },
               child: const Text('Save & Reconnect'),
@@ -70,7 +83,7 @@ class SplashWelcomeScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
@@ -82,7 +95,7 @@ class SplashWelcomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
             tooltip: 'Configure Backend Server',
-            onPressed: () => _showServerSettings(context),
+            onPressed: () => _showServerSettings(context, ref),
           ),
         ],
       ),

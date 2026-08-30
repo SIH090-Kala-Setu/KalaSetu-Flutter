@@ -153,6 +153,7 @@ class _ArtisanRegistrationWizardState extends ConsumerState<ArtisanRegistrationW
         preferredLang: ref.read(localeProvider).languageCode,
         craftType: _selectedCrafts.isNotEmpty ? _selectedCrafts.first : 'Handicrafts',
         region: _selectedState,
+        district: _selectedDistrict,
         aadhaarNumber: '123456789012',
       );
 

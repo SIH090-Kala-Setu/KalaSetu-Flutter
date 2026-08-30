@@ -44,6 +44,7 @@ class ApiClient {
     String? preferredLang,
     String? craftType,
     String? region,
+    String? district,
     String? aadhaarNumber,
   }) async {
     final response = await _dio.post(
@@ -55,6 +56,7 @@ class ApiClient {
         'preferred_lang': preferredLang ?? 'hi',
         'craft_type': craftType,
         'region': region,
+        'district': district,
         'aadhaar_number': aadhaarNumber,
       },
     );

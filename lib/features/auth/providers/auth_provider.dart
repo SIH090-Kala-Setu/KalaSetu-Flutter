@@ -89,6 +89,32 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// Called after fetching fresh data from the backend (e.g. dashboard/profile)
+  /// to sync the locally cached verification status with the server's truth.
+  Future<void> refreshUserVerification(bool isVerified) async {
+    if (_currentUser == null) return;
+    _currentUser = UserModel(
+      id: _currentUser!.id,
+      username: _currentUser!.username,
+      fullName: _currentUser!.fullName,
+      phoneNumber: _currentUser!.phoneNumber,
+      role: _currentUser!.role,
+      isVerified: isVerified,
+    );
+    // Persist updated status
+    final storage = ref.read(localStorageProvider);
+    await storage.saveUserSession(
+      token: (await storage.getToken()) ?? '',
+      role: _currentUser!.role,
+      fullName: _currentUser!.fullName,
+      phone: _currentUser!.phoneNumber,
+      isVerified: isVerified,
+    );
+    // Notify listeners so banners/badges rebuild
+    // We don't change AuthState enum, just touch the notifier so watchers rebuild.
+    state = state;
+  }
+
   Future<void> logout() async {
     final storage = ref.read(localStorageProvider);
     await storage.clearAuthSession();

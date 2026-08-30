@@ -7,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/models/user_model.dart';
+import '../../../shared/models/cluster_model.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AggregatorHomeScreen extends ConsumerStatefulWidget {
@@ -19,10 +20,16 @@ class AggregatorHomeScreen extends ConsumerStatefulWidget {
 
 class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
   bool _isLoading = true;
-  int _totalArtisans = 48;
-  int _activeListings = 112;
-  final int _pendingVerifications = 8;
-  int _inquiriesThisMonth = 34;
+  int _totalArtisans = 0;
+  int _activeListings = 0;
+  int _pendingVerifications = 0;
+  int _inquiriesThisMonth = 0;
+  String _aggregatorName = '';
+  // First cluster info for the banner
+  String _clusterName = '';
+  String _clusterState = '';
+  String _clusterCraft = '';
+  String? _firstClusterId;
 
   List<UserModel> _unlistedArtisans = [];
 
@@ -37,21 +44,44 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
       final apiClient = ref.read(apiClientProvider);
       final data = await apiClient.getAggregatorDashboard();
       final artisans = await apiClient.getAggregatorArtisans();
+
+      // Extract first cluster info for the banner
+      final clusters = data['clusters'] as List<dynamic>? ?? [];
+      String clusterName = '';
+      String clusterState = '';
+      String clusterCraft = '';
+      String? firstClusterId;
+      int pendingKyc = 0;
+
+      if (clusters.isNotEmpty) {
+        final first = clusters[0] as Map<String, dynamic>;
+        clusterName = first['cluster_name']?.toString() ?? '';
+        clusterState = first['state']?.toString() ?? '';
+        clusterCraft = first['craft_specialization']?.toString() ?? '';
+        firstClusterId = first['cluster_id']?.toString();
+        // Sum artisans_needing_support across all clusters as pending KYC proxy
+        for (final c in clusters) {
+          pendingKyc += ((c as Map<String, dynamic>)['artisans_needing_support'] as int? ?? 0);
+        }
+      }
+
       if (mounted) {
         setState(() {
+          _aggregatorName = data['aggregator_name']?.toString() ?? '';
           _totalArtisans = data['total_artisans'] ?? artisans.length;
           _activeListings = data['total_active_listings'] ?? 0;
           _inquiriesThisMonth = data['total_pending_inquiries'] ?? 0;
+          _pendingVerifications = pendingKyc;
+          _clusterName = clusterName;
+          _clusterState = clusterState;
+          _clusterCraft = clusterCraft;
+          _firstClusterId = firstClusterId;
           _unlistedArtisans = artisans.where((a) => !a.isVerified).toList();
           _isLoading = false;
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -112,52 +142,35 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
                   labelText: 'Craft Specialization',
                 ),
                 items: const [
-                  DropdownMenuItem(
-                    value: 'Textiles & Handloom',
-                    child: Text('Textiles & Handloom'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Clay & Pottery',
-                    child: Text('Clay & Pottery'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Jewelry & Silver',
-                    child: Text('Jewelry & Silver'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Woodwork & Inlay',
-                    child: Text('Woodwork & Inlay'),
-                  ),
+                  DropdownMenuItem(value: 'Textiles & Handloom', child: Text('Textiles & Handloom')),
+                  DropdownMenuItem(value: 'Clay & Pottery', child: Text('Clay & Pottery')),
+                  DropdownMenuItem(value: 'Jewelry & Silver', child: Text('Jewelry & Silver')),
+                  DropdownMenuItem(value: 'Woodwork & Inlay', child: Text('Woodwork & Inlay')),
                 ],
-                onChanged: (v) {
-                  if (v != null) craftType = v;
-                },
+                onChanged: (v) { if (v != null) craftType = v; },
               ),
               const SizedBox(height: 24),
               AppButton(
                 label: 'Submit for MoSJE Onboarding',
                 onPressed: () async {
-                  if (nameController.text.isEmpty ||
-                      phoneController.text.isEmpty) {
-                    return;
-                  }
+                  if (nameController.text.isEmpty || phoneController.text.isEmpty) return;
                   final apiClient = ref.read(apiClientProvider);
                   await apiClient.onboardArtisan(
                     fullName: nameController.text.trim(),
                     phone: phoneController.text.trim(),
                     craftType: craftType,
-                    clusterName: 'Patan Patola Handloom Cluster',
+                    // Use the real cluster name from dashboard, not hardcoded
+                    clusterName: _clusterName.isNotEmpty ? _clusterName : null,
                   );
                   if (!context.mounted) return;
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       backgroundColor: AppColors.success,
-                      content: Text(
-                        'Artisan onboarded and added to cluster queue!',
-                      ),
+                      content: Text('Artisan onboarded and added to cluster queue!'),
                     ),
                   );
+                  _fetchDashboard();
                 },
               ),
             ],
@@ -169,6 +182,12 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bannerSubtitle = [
+      if (_clusterState.isNotEmpty) _clusterState,
+      if (_clusterCraft.isNotEmpty) _clusterCraft,
+      if (_totalArtisans > 0) '$_totalArtisans Active Artisans',
+    ].join(' · ');
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -194,7 +213,7 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Cluster Banner
+                  // Cluster Banner — live data
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -214,18 +233,17 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Patan Patola Cluster',
-                              style: AppTextStyles.display.copyWith(
-                                color: Colors.white,
-                                fontSize: 22,
+                            Expanded(
+                              child: Text(
+                                _clusterName.isNotEmpty ? _clusterName : (_aggregatorName.isNotEmpty ? '$_aggregatorName\'s Cluster' : 'My Cluster'),
+                                style: AppTextStyles.display.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                ),
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: AppColors.accent,
                                 borderRadius: BorderRadius.circular(6),
@@ -241,55 +259,32 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Gujarat · Silk & Ikat Specialization · 48 Active Artisans',
-                          style: AppTextStyles.caption.copyWith(
-                            color: Colors.white70,
+                        if (bannerSubtitle.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            bannerSubtitle,
+                            style: AppTextStyles.caption.copyWith(color: Colors.white70),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
                   // Horizontal Scroll Summary Cards
-                  Text(
-                    'Cluster Health Metrics',
-                    style: AppTextStyles.heading.copyWith(fontSize: 18),
-                  ),
+                  Text('Cluster Health Metrics', style: AppTextStyles.heading.copyWith(fontSize: 18)),
                   const SizedBox(height: 12),
                   SizedBox(
                     height: 110,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
-                        _buildSummaryCard(
-                          'Total Artisans',
-                          '$_totalArtisans',
-                          Icons.group,
-                          AppColors.primary,
-                        ),
+                        _buildSummaryCard('Total Artisans', '$_totalArtisans', Icons.group, AppColors.primary),
                         const SizedBox(width: 12),
-                        _buildSummaryCard(
-                          'Active Listings',
-                          '$_activeListings',
-                          Icons.inventory_2,
-                          AppColors.success,
-                        ),
+                        _buildSummaryCard('Active Listings', '$_activeListings', Icons.inventory_2, AppColors.success),
                         const SizedBox(width: 12),
-                        _buildSummaryCard(
-                          'Pending KYC',
-                          '$_pendingVerifications',
-                          Icons.hourglass_empty,
-                          const Color(0xFFD68910),
-                        ),
+                        _buildSummaryCard('Needs Support', '$_pendingVerifications', Icons.hourglass_empty, const Color(0xFFD68910)),
                         const SizedBox(width: 12),
-                        _buildSummaryCard(
-                          'Inquiries (30d)',
-                          '$_inquiriesThisMonth',
-                          Icons.chat,
-                          AppColors.accent,
-                        ),
+                        _buildSummaryCard('Inquiries (30d)', '$_inquiriesThisMonth', Icons.chat, AppColors.accent),
                       ],
                     ),
                   ),
@@ -309,17 +304,9 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Assisted Onboarding',
-                                style: AppTextStyles.body.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              Text('Assisted Onboarding', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
                               const SizedBox(height: 2),
-                              Text(
-                                'Help low-literacy artisans register with voice in 2 mins',
-                                style: AppTextStyles.caption,
-                              ),
+                              Text('Help low-literacy artisans register with voice in 2 mins', style: AppTextStyles.caption),
                             ],
                           ),
                         ),
@@ -331,10 +318,7 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 14),
                             minimumSize: const Size(60, 40),
                           ),
-                          child: const Text(
-                            'Start',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          child: const Text('Start', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -344,21 +328,15 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Artisans Needing Help',
-                        style: AppTextStyles.heading.copyWith(fontSize: 18),
-                      ),
+                      Text('Artisans Needing Help', style: AppTextStyles.heading.copyWith(fontSize: 18)),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '0 Listings (Unlisted)',
+                          '${_unlistedArtisans.length} Unlisted',
                           style: AppTextStyles.caption.copyWith(
                             color: AppColors.error,
                             fontWeight: FontWeight.bold,
@@ -368,64 +346,53 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  ..._unlistedArtisans.map(
-                    (artisan) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10.0),
-                      child: AppCard(
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: AppColors.primary.withValues(
-                                alpha: 0.1,
+                  if (_unlistedArtisans.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: Text('All artisans are verified ✓', style: TextStyle(color: AppColors.success))),
+                    )
+                  else
+                    ..._unlistedArtisans.map(
+                      (artisan) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10.0),
+                        child: AppCard(
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                child: const Icon(Icons.person, color: AppColors.primary),
                               ),
-                              child: const Icon(
-                                Icons.person,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    artisan.fullName,
-                                    style: AppTextStyles.body.copyWith(
-                                      fontWeight: FontWeight.bold,
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(artisan.fullName, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
+                                    Text(
+                                      [artisan.district, artisan.state].where((s) => s != null && s.isNotEmpty).join(', '),
+                                      style: AppTextStyles.caption,
                                     ),
-                                  ),
-                                  Text(
-                                    '${artisan.district}, ${artisan.state} · 0 products',
-                                    style: AppTextStyles.caption,
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            AppButton(
-                              label: 'Assist Studio',
-                              width: 120,
-                              height: 42,
-                              onPressed: () {
-                                context.push('/artisan/studio');
-                              },
-                            ),
-                          ],
+                              AppButton(
+                                label: 'Assist Studio',
+                                width: 120,
+                                height: 42,
+                                onPressed: () => context.push('/artisan/studio'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
     );
   }
 
-  Widget _buildSummaryCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
     return Container(
       width: 140,
       padding: const EdgeInsets.all(14),
@@ -440,19 +407,8 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
         children: [
           Icon(icon, size: 24, color: color),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: AppTextStyles.heading.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          Text(
-            title,
-            style: AppTextStyles.caption.copyWith(fontSize: 11),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(value, style: AppTextStyles.heading.copyWith(fontSize: 20, fontWeight: FontWeight.w800)),
+          Text(title, style: AppTextStyles.caption.copyWith(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
       ),
     );

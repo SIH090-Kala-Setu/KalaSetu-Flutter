@@ -115,6 +115,127 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  void _showProfileEditSheet(BuildContext context) {
+    final crafts = [
+      'Weaving', 'Pottery', 'Embroidery', 'Woodwork', 'Metalwork',
+      'Painting', 'Jewelry', 'Leather', 'Stone Carving', 'Bamboo',
+      'Handloom', 'Block Printing', 'Other Handicrafts',
+    ];
+    final languages = ['hi', 'en', 'ta', 'te', 'mr', 'bn', 'gu', 'kn', 'or', 'pa'];
+    final langNames = {
+      'hi': 'Hindi', 'en': 'English', 'ta': 'Tamil', 'te': 'Telugu',
+      'mr': 'Marathi', 'bn': 'Bengali', 'gu': 'Gujarati', 'kn': 'Kannada',
+      'or': 'Odia', 'pa': 'Punjabi',
+    };
+
+    final nameCtrl = TextEditingController(text: _profileData?['full_name']?.toString() ?? '');
+    final districtCtrl = TextEditingController(text: _profileData?['cluster_name']?.toString() ?? '');
+    final aadhaarCtrl = TextEditingController(text: _profileData?['aadhaar_number']?.toString() ?? '');
+    String selectedCraft = _profileData?['craft_type']?.toString() ?? crafts.first;
+    String selectedLang = _profileData?['preferred_language']?.toString() ?? 'hi';
+    if (!crafts.contains(selectedCraft)) selectedCraft = crafts.first;
+    if (!languages.contains(selectedLang)) selectedLang = 'hi';
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24, right: 24, top: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Edit Profile', style: AppTextStyles.heading.copyWith(fontSize: 18)),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        hintText: 'Your full name',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedCraft,
+                      decoration: const InputDecoration(labelText: 'Craft Type'),
+                      items: crafts.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) => setSheetState(() => selectedCraft = v ?? selectedCraft),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: districtCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Cluster / District',
+                        hintText: 'e.g. Varanasi Cluster',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: aadhaarCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Aadhaar Number',
+                        hintText: '12-digit Aadhaar number',
+                      ),
+                      keyboardType: TextInputType.number,
+                      maxLength: 12,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedLang,
+                      decoration: const InputDecoration(labelText: 'Preferred Language'),
+                      items: languages.map((l) => DropdownMenuItem(
+                        value: l,
+                        child: Text(langNames[l] ?? l),
+                      )).toList(),
+                      onChanged: (v) => setSheetState(() => selectedLang = v ?? selectedLang),
+                    ),
+                    const SizedBox(height: 20),
+                    AppButton(
+                      label: 'Save Profile',
+                      isLoading: isSaving,
+                      onPressed: () async {
+                        setSheetState(() => isSaving = true);
+                        try {
+                          final apiClient = ref.read(apiClientProvider);
+                          await apiClient.updateArtisanProfile({
+                            'full_name': nameCtrl.text.trim(),
+                            'craft_type': selectedCraft,
+                            'cluster_name': districtCtrl.text.trim(),
+                            'preferred_language': selectedLang,
+                            if (aadhaarCtrl.text.trim().isNotEmpty)
+                              'aadhaar_number': aadhaarCtrl.text.trim(),
+                          });
+                          _fetchProfile();
+                        } catch (_) {}
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Profile updated successfully ✓')),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _downloadReport() async {
     try {
       final apiClient = ref.read(apiClientProvider);
@@ -178,6 +299,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 // Profile Header Card
                 AppCard(
                   padding: const EdgeInsets.all(20),
+                  onTap: () => _showProfileEditSheet(context),
                   child: Row(
                     children: [
                       CircleAvatar(

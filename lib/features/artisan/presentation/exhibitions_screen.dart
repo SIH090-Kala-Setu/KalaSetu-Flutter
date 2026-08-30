@@ -44,22 +44,35 @@ class _ExhibitionsScreenState extends ConsumerState<ExhibitionsScreen> {
     }
   }
 
+  // Track which exhibition IDs are currently registering (loading state)
+  final Set<String> _registering = {};
+
   void _registerStall(ExhibitionModel ex) async {
+    if (_registering.contains(ex.id)) return;
+    setState(() => _registering.add(ex.id));
     try {
       final apiClient = ref.read(apiClientProvider);
       await apiClient.registerForExhibition(ex.id);
-    } catch (_) {}
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.success,
-          content: Text(
-            '🎉 Registered stall for ${ex.name}! MoSJE stall badge issued.',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.success,
+            content: Text('✅ Applied for stall at ${ex.name}! Pending MoSJE approval.'),
           ),
-        ),
-      );
-      _fetchExhibitions();
+        );
+        _fetchExhibitions(); // Refresh to get Pending state
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to register: ${e.toString()}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _registering.remove(ex.id));
     }
   }
 
@@ -70,11 +83,41 @@ class _ExhibitionsScreenState extends ConsumerState<ExhibitionsScreen> {
       appBar: AppBar(title: const Text('National Exhibitions & Melas')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
+          : RefreshIndicator(
+              onRefresh: () async => _fetchExhibitions(),
+              child: _exhibitions.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Text('No exhibitions available right now.', textAlign: TextAlign.center),
+                    ),
+                  )
+                : ListView.builder(
               padding: const EdgeInsets.all(16.0),
               itemCount: _exhibitions.length,
               itemBuilder: (context, index) {
                 final ex = _exhibitions[index];
+                final isRegistering = _registering.contains(ex.id);
+
+                // Determine button appearance based on 3 states
+                final String buttonLabel;
+                final AppButtonVariant buttonVariant;
+                final VoidCallback? buttonOnPressed;
+
+                if (ex.regStatus == 'Approved') {
+                  buttonLabel = '✅ Stall Approved by MoSJE';
+                  buttonVariant = AppButtonVariant.outlined;
+                  buttonOnPressed = null;
+                } else if (ex.isRegistered) {
+                  buttonLabel = '⏳ Pending MoSJE Approval';
+                  buttonVariant = AppButtonVariant.outlined;
+                  buttonOnPressed = null;
+                } else {
+                  buttonLabel = isRegistering ? 'Registering...' : 'Register for Stall (Free)';
+                  buttonVariant = AppButtonVariant.primary;
+                  buttonOnPressed = isRegistering ? null : () => _registerStall(ex);
+                }
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 14.0),
                   child: AppCard(
@@ -87,9 +130,7 @@ class _ExhibitionsScreenState extends ConsumerState<ExhibitionsScreen> {
                             Expanded(
                               child: Text(
                                 ex.name,
-                                style: AppTextStyles.heading.copyWith(
-                                  fontSize: 16,
-                                ),
+                                style: AppTextStyles.heading.copyWith(fontSize: 16),
                               ),
                             ),
                             StatusBadge(status: ex.status),
@@ -98,51 +139,30 @@ class _ExhibitionsScreenState extends ConsumerState<ExhibitionsScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(
-                              Icons.location_on_outlined,
-                              size: 16,
-                              color: AppColors.textSecondary,
-                            ),
+                            const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textSecondary),
                             const SizedBox(width: 6),
                             Expanded(
-                              child: Text(
-                                ex.location,
-                                style: AppTextStyles.caption.copyWith(
-                                  fontSize: 13,
-                                ),
-                              ),
+                              child: Text(ex.location,
+                                  style: AppTextStyles.caption.copyWith(fontSize: 13)),
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(
-                              Icons.calendar_today_outlined,
-                              size: 16,
-                              color: AppColors.textSecondary,
-                            ),
+                            const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.textSecondary),
                             const SizedBox(width: 6),
-                            Text(
-                              '${ex.startDate}  to  ${ex.endDate}',
-                              style: AppTextStyles.caption.copyWith(
-                                fontSize: 13,
-                              ),
-                            ),
+                            Text('${ex.startDate}  to  ${ex.endDate}',
+                                style: AppTextStyles.caption.copyWith(fontSize: 13)),
                           ],
                         ),
                         const SizedBox(height: 16),
                         AppButton(
-                          label: ex.isRegistered
-                              ? 'Registered Stall ✓'
-                              : 'Register for Stall (Free)',
-                          variant: ex.isRegistered
-                              ? AppButtonVariant.outlined
-                              : AppButtonVariant.primary,
+                          label: buttonLabel,
+                          variant: buttonVariant,
                           height: 48,
-                          onPressed: ex.isRegistered
-                              ? null
-                              : () => _registerStall(ex),
+                          isLoading: isRegistering,
+                          onPressed: buttonOnPressed,
                         ),
                       ],
                     ),
@@ -150,6 +170,7 @@ class _ExhibitionsScreenState extends ConsumerState<ExhibitionsScreen> {
                 );
               },
             ),
+          ),
     );
   }
 }

@@ -8,10 +8,11 @@ import 'api_exceptions.dart';
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
-      baseUrl: ApiEndpoints.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
+      // Do NOT hard-code baseUrl here — it is injected per-request
+      // by the interceptor below so URL changes take effect immediately.
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
       headers: {
         'Accept': 'application/json',
       },
@@ -21,9 +22,14 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
-        // Ensure baseUrl matches latest endpoint config
-        options.baseUrl = ApiEndpoints.baseUrl;
-        
+        // Always use the current override URL — this picks up any runtime change
+        // made via ApiEndpoints.setBaseUrl() without needing a provider invalidation.
+        final currentBase = ApiEndpoints.baseUrl;
+        if (!options.uri.isAbsolute) {
+          // Path is relative — prefix with the current base URL
+          options.baseUrl = currentBase;
+        }
+
         final storage = ref.read(localStorageProvider);
         final token = await storage.getToken();
         if (token != null && token.isNotEmpty) {
