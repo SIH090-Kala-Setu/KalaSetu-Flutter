@@ -174,8 +174,13 @@ class ApiClient {
     String? state,
     double? minPrice,
     double? maxPrice,
+    int limit = 40,
+    int offset = 0,
   }) async {
-    final queryParams = <String, dynamic>{};
+    final queryParams = <String, dynamic>{
+      'limit': limit,
+      'offset': offset,
+    };
     if (craft != null && craft.isNotEmpty && craft != 'All') {
       queryParams['category'] = craft;
     }
