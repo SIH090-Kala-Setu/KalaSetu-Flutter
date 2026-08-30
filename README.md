@@ -49,6 +49,7 @@ Traditional government exhibitions (**Shilp Samagam**, **Surajkund Mela**, **Dil
 * 📸 **Studio AI Enhancement**: Removes cluttered workshop backgrounds and optimizes studio lighting using lightweight edge models.
 * 🎙️ **Voice-to-Catalog in Native Tongues**: Transcribes voice recordings in 8 Indian languages and automatically generates bilingual English & Hindi product stories with SEO keywords via Gemini AI.
 * 💰 **Dynamic Fair Wage Pricing**: Computes fair hourly compensation (₹150/hr benchmark) and craft category multipliers (1.3× to 2.0×) to prevent middleman exploitation.
+* 🔔 **Real-Time Push & Alert Engine**: Firebase Cloud Messaging (FCM v1) delivering instant alerts for KYC verifications, inventory stockouts, government welfare schemes, exhibition stall approvals, and buyer inquiry replies.
 * 🛍️ **Direct B2B Linkages**: Connects artisans directly to verified bulk buyers and export houses without commissions.
 * 🏛️ **MoSJE Governance & Cluster Aggregation**: Enables field aggregators to onboard illiterate artisans, broadcast welfare schemes, and relay reports to Ministry Administrators.
 
@@ -59,6 +60,7 @@ Traditional government exhibitions (**Shilp Samagam**, **Surajkund Mela**, **Dil
 | Component | Technology | Description |
 |:---|:---|:---|
 | **Framework** | **Flutter 3.x (Dart 3.x)** | High-performance cross-platform client (Android, iOS, Web, Windows) |
+| **Push Notifications** | **firebase_messaging & core** | FCM HTTP v1 push notifications, background message entry-point & foreground banners |
 | **State Management** | **Flutter Riverpod 3.x** | Pure functional, reactive state management using `Notifier` and `ProviderScope` |
 | **Navigation** | **GoRouter 17.x** | Declarative URL-based routing with role-specific `ShellRoute` bars and auth state redirects |
 | **HTTP & Networking** | **Dio 5.x** | Typed HTTP client with dynamic `baseUrl`, request logging, and JWT bearer interceptors |
@@ -66,7 +68,7 @@ Traditional government exhibitions (**Shilp Samagam**, **Surajkund Mela**, **Dil
 | **User Preferences** | **shared_preferences** | Persistent locale and offline configuration cache |
 | **Typography** | **google_fonts (Noto Sans)** | Unicode-compliant typography rendering all Indic script ligatures cleanly |
 | **Localization** | **flutter_localizations & intl** | Native ARB catalogs supporting 8 Indian languages |
-| **Camera & Media** | **image_picker, camera** | Native viewfinder capture, torch control, and gallery picker |
+| **Camera & Media** | **image_picker, camera, record** | Native viewfinder capture, torch control, gallery picker & AAC audio recording |
 | **Image Rendering** | **ProductThumbnail Widget** | Base64 Data URI decoder + remote image caching with error fallbacks |
 
 ---
@@ -75,18 +77,19 @@ Traditional government exhibitions (**Shilp Samagam**, **Surajkund Mela**, **Dil
 
 ```
 learningdart/
-├── .gitignore                               # Comprehensive ignore rules (Flutter, Dart, Android, iOS, Windows, macOS)
+├── .gitignore                               # Ignore rules (Flutter, Dart, Android, iOS, Windows, macOS, Firebase credentials)
 ├── pubspec.yaml                             # Dependencies, assets, and localization declarations
 ├── l10n.yaml                                # Localization generator configuration
 ├── README.md                                # Project documentation
 ├── lib/
-│   ├── main.dart                            # Initializes WidgetsBinding, SharedPreferences, Riverpod ProviderScope
-│   ├── app.dart                             # MaterialApp.router with RestartWidget, 8-language localization & AppTheme
+│   ├── main.dart                            # Initializes WidgetsBinding, Firebase, SharedPreferences, Riverpod ProviderScope
+│   ├── app.dart                             # MaterialApp.router, FcmListener banner handler, 8-language localization & AppTheme
 │   ├── core/
 │   │   ├── theme/                           # AppTheme, AppColors, AppTextStyles
 │   │   ├── router/                          # AppRouter with role guards and ShellRoutes
 │   │   ├── network/                         # DioClient, AuthInterceptor, ApiEndpoints, ApiClient
 │   │   ├── storage/                         # LocalStorage (SecureStorage & SharedPrefs wrappers)
+│   │   ├── services/                        # FcmService (device token registration & message streams)
 │   │   ├── l10n/                            # 8 ARB files (en, hi, bn, ta, te, mr, kn, gu) & generated AppLocalizations
 │   │   └── utils/                           # Validators, formatters, and extensions
 │   ├── features/
@@ -140,21 +143,21 @@ learningdart/
 
 ### 1. 🧵 Artisan / Karigar Suite (`/artisan/*`)
 - **Bottom Navigation**: `Home` · `Catalogue` · `Inquiries` · `Profile`.
-- **Home Dashboard**: Total earnings card, 2x2 quick action grid (*Add Product, My Catalogue, Inquiries, Exhibitions*), recent inquiry cards, and MoSJE verified badge.
+- **Home Dashboard**: Total earnings card, 2x2 quick action grid (*Add Product, My Catalogue, Inquiries, Exhibitions*), live verification badge synchronization with backend, and recent inquiry cards.
 - **AI Camera Studio (4-Phase Pipeline)**:
   1. *Capture*: Camera viewfinder with product alignment guide, torch, and gallery import.
   2. *AI Enhance*: Calls `POST /enhance` for background removal & studio lighting + quality score badge (92/100).
-  3. *Voice Cataloger*: Voice recording waveform, Gemini AI bilingual translation (`POST /catalog`), and editable fields.
+  3. *Voice Cataloger*: Real voice recording (`.m4a` AAC), Gemini AI bilingual translation (`POST /catalog`), and editable fields.
   4. *Dynamic Pricing*: 3-tier price cards (*Minimum*, *Suggested ★*, *Premium*), raw material margin calculator (`POST /suggest-price`), and 1-click publish (`POST /products`).
-- **Catalogue Manager**: 2-column grid, status filter chips, inline price editing (`PUT /products/{id}/price`), stock incrementer ($+/-$), and exhibition QR code generator dialog (`GET /products/{id}/qr`).
+- **Catalogue Manager**: 2-column grid, status filter chips, inline price editing (`PUT /products/{id}/price`), stock incrementer ($+/-$), out-of-stock badge, and exhibition QR code generator dialog (`GET /products/{id}/qr`).
 - **Inquiries**: Wholesale RFQs, message thread modal, and quotation response handler (`POST /inquiries/{id}/respond`).
-- **Exhibitions**: National fairs (*Shilp Samagam*, *Surajkund Mela*, *Dilli Haat*) with 1-click digital stall registration.
-- **Profile & Reports**: Bank & UPI details editor (`PUT /artisan/profile`), cluster info, and downloadable CSV Sales Report (`GET /artisan/report`).
+- **Exhibitions**: National fairs (*Shilp Samagam*, *Surajkund Mela*, *Dilli Haat*) with 3-state stall lifecycle: `Register` ➔ `⏳ Pending MoSJE Approval` ➔ `✅ Stall Approved by MoSJE`.
+- **Profile & Reports**: Full Profile Editor bottom sheet (Full Name, Craft Type, Cluster, Preferred Language), Bank & UPI details editor (`PUT /artisan/profile`), cluster info, and downloadable CSV Sales Report (`GET /artisan/report`).
 
 ### 2. 🤝 Cluster Aggregator Suite (`/aggregator/*`)
 - **Bottom Navigation**: `Clusters` · `Artisans` · `Analytics` · `Alerts`.
 - **Cluster Dashboard**: Health overview (*Total Artisans, Active Listings, Inquiries*), and unlisted artisans needing support list.
-- **Assisted Onboarding**: In-field registration modal for illiterate artisans with automatic cluster assignment (`POST /aggregator/artisans/onboard`).
+- **Assisted Onboarding**: In-field registration modal for illiterate artisans with automatic cluster assignment and verification queueing (`POST /aggregator/artisans/onboard`).
 - **My Artisans Roster**: Searchable list with status filters (*All, Verified, Pending, Needs Help*) and "Assist" studio launcher.
 - **Cluster Analytics**: Craft distribution progress bars and 30-day inquiry trends (`GET /aggregator/dashboard`).
 - **Alerts & Reporting**: Broadcast MoSJE scheme alerts to cluster artisans (`POST /aggregator/schemes/relay`), and submit monthly progress reports to MoSJE Admin (`POST /aggregator/reports/submit`).
@@ -165,6 +168,16 @@ learningdart/
 - **Product Detail**: Full image gallery, English/Hindi story toggle, wholesale margin calculator, artisan verified badge, and "Send Bulk Inquiry" drawer (`POST /inquiries`).
 - **My Inquiries**: Sent wholesale RFQ tracking with lifecycle status (*Pending*, *Responded*, *Completed*) (`GET /buyer/dashboard`).
 - **Buyer Profile**: Company details, verified buyer badge, and procurement metrics.
+
+### 4. 🔔 Notifications & Government Alerts (`/notifications`)
+- Real-time notification center paired with FCM push notifications.
+- **Categorized Color-Coded Badges**:
+  - `💬 Inquiry` (Primary Blue): Wholesale inquiry submissions & artisan quotation responses.
+  - `🏛️ Govt Scheme` (Amber): Central & state welfare schemes and 14-day expiring scheme warnings.
+  - `✅ Verification` (Forest Green): Aadhaar & Bank KYC approvals, partial updates, and rejection reasons.
+  - `📦 Inventory / Update` (Deep Orange): Product out of stock (0 units) alerts.
+  - `🎪 Announcement` (Indigo): National exhibition announcements and stall approvals.
+- Pull-to-refresh (`RefreshIndicator`), timestamp formatting, empty state guide, and "Mark all as read" (`PUT /notifications/mark-all-read`).
 
 ---
 
@@ -296,12 +309,20 @@ flutter pub get
 flutter gen-l10n
 ```
 
-### 3. Run on Target Platform
+### 3. Firebase Push Notifications Setup (Optional for Web/Desktop, Required for Android Push)
+1. Download `google-services.json` from your Firebase Console project.
+2. Place the file at:
+   ```
+   learningdart/android/app/google-services.json
+   ```
+*(Note: `google-services.json` is already ignored by `.gitignore` to protect credentials).*
+
+### 4. Run on Target Platform
 ```bash
 # Run on Windows Desktop
 flutter run -d windows
 
-# Run on Android Emulator
+# Run on Android Device / Emulator
 flutter run -d emulator-5554
 
 # Run on Web (Chrome)

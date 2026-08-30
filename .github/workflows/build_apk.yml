@@ -29,6 +29,18 @@ jobs:
           flutter pub get
           flutter gen-l10n
 
+      - name: Setup google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "✅ Loaded google-services.json from GitHub secret."
+          else
+            echo '{"project_info":{"project_number":"100000000000","project_id":"kalasetu-53f92","storage_bucket":"kalasetu-53f92.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:100000000000:android:0000000000000000000000","android_client_info":{"package_name":"com.example.learningdart"}},"oauth_client":[],"api_key":[{"current_key":"dummy_api_key"}],"services":{"analytics_service":{"status":1}}}]}' > android/app/google-services.json
+            echo "⚠️ Using fallback google-services.json structure for CI build."
+          fi
+
       - name: Build Android Release APK
         run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
