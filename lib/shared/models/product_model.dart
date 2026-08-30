@@ -132,7 +132,10 @@ class PriceBreakdownModel {
   final double suggestedRetailPrice;
   final double suggestedB2BPrice;
   final double minimumBreakevenPrice;
-  final double estimatedProfitMargin;
+  final double marketAvg;
+  final double marketMin;
+  final double marketMax;
+  final String complexity;
   final String explanation;
   final String? competitorRange;
 
@@ -140,7 +143,10 @@ class PriceBreakdownModel {
     required this.suggestedRetailPrice,
     required this.suggestedB2BPrice,
     required this.minimumBreakevenPrice,
-    required this.estimatedProfitMargin,
+    required this.marketAvg,
+    required this.marketMin,
+    required this.marketMax,
+    required this.complexity,
     required this.explanation,
     this.competitorRange,
   });
@@ -148,15 +154,17 @@ class PriceBreakdownModel {
   factory PriceBreakdownModel.fromJson(Map<String, dynamic> json) {
     final baseMat = (json['base_material_cost'] ?? 0).toDouble();
     final labor = (json['labor_cost'] ?? 0).toDouble();
-    final minPrice = (json['minimum_breakeven_price'] ?? json['min_price'] ?? (baseMat + labor)).toDouble();
+    final minPrice = (json['min_price'] ?? json['minimum_breakeven_price'] ?? (baseMat + labor)).toDouble();
     final retail = (json['suggested_retail_price'] ?? json['suggested_price'] ?? (minPrice * 1.5)).toDouble();
-    final b2b = (json['suggested_b2b_price'] ?? json['b2b_price'] ?? (retail * 0.85)).toDouble();
-
+    final b2b = (json['suggested_b2b_price'] ?? json['b2b_price'] ?? (retail * 0.75)).toDouble();
     return PriceBreakdownModel(
       suggestedRetailPrice: retail,
       suggestedB2BPrice: b2b,
       minimumBreakevenPrice: minPrice > 0 ? minPrice : (retail * 0.7),
-      estimatedProfitMargin: (json['estimated_profit_margin_percent'] ?? json['profit_margin'] ?? 30).toDouble(),
+      marketAvg: (json['market_avg'] ?? 0).toDouble(),
+      marketMin: (json['market_min'] ?? 0).toDouble(),
+      marketMax: (json['market_max'] ?? 0).toDouble(),
+      complexity: json['complexity']?.toString() ?? 'moderate',
       explanation: json['pricing_strategy_notes']?.toString() ?? json['explanation']?.toString() ?? 'Calculated using fair wage multiplier and raw material costs.',
       competitorRange: json['competitor_range']?.toString(),
     );

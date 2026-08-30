@@ -148,19 +148,19 @@ class ApiClient {
     required double materialCost,
     double manufacturingHours = 4.0,
     String productDescription = '',
-    String? region,
-    String? craftType,
+    Uint8List? imageBytes,
   }) async {
+    final formData = FormData.fromMap({
+      'category': category,
+      'material_cost': materialCost,
+      'manufacturing_hours': manufacturingHours,
+      'product_description': productDescription,
+      if (imageBytes != null && imageBytes.isNotEmpty)
+        'image': MultipartFile.fromBytes(imageBytes, filename: 'product.jpg'),
+    });
     final response = await _dio.post(
       ApiEndpoints.suggestPrice,
-      data: {
-        'category': category,
-        'material_cost': materialCost,
-        'manufacturing_hours': manufacturingHours,
-        'product_description': productDescription,
-        'region': region ?? 'Uttar Pradesh',
-        'craft_type': craftType ?? category,
-      },
+      data: formData,
     );
     return PriceBreakdownModel.fromJson(response.data);
   }

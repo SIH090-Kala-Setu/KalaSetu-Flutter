@@ -62,8 +62,12 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   double _premiumPrice = 1800.0;
   double _selectedPrice = 1200.0;
   double _b2bPrice = 1020.0;
+  double _marketAvg = 0.0;
+  double _marketMin = 0.0;
+  double _marketMax = 0.0;
+  String _complexity = 'moderate';
   String _pricingNotes = 'Calculated using fair wage multiplier and raw material costs.';
-  String? _competitorRange = '₹ 1,000 - ₹ 1,800';
+  String? _competitorRange = '₹ 1,000 – ₹ 1,800';
   bool _isCalculatingPricing = false;
   bool _isListing = false;
 
@@ -266,30 +270,36 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
         category: _craftCategory,
         materialCost: _materialCost,
         manufacturingHours: _manufacturingHours,
-        productDescription: _descEnController.text.isNotEmpty ? _descEnController.text : _titleEnController.text,
+        productDescription: _descEnController.text.isNotEmpty
+            ? _descEnController.text
+            : _titleEnController.text,
+        imageBytes: _enhancedBytes ?? _capturedImage?.readAsBytesSync(),
       );
 
       if (mounted) {
         setState(() {
           _minPrice = pricing.minimumBreakevenPrice;
           _suggestedPrice = pricing.suggestedRetailPrice;
-          _premiumPrice = _suggestedPrice * 1.35;
+          _premiumPrice = (_suggestedPrice * 1.35).roundToDouble();
           _selectedPrice = _suggestedPrice;
-          _b2bPrice = pricing.suggestedB2BPrice > 0 ? pricing.suggestedB2BPrice : (_selectedPrice * 0.85);
+          _b2bPrice = pricing.suggestedB2BPrice;
           _pricingNotes = pricing.explanation;
-          _competitorRange = pricing.competitorRange ?? '₹ ${(_minPrice * 0.9).toStringAsFixed(0)} - ₹ ${(_premiumPrice).toStringAsFixed(0)}';
+          _competitorRange = pricing.competitorRange;
+          _marketAvg = pricing.marketAvg;
+          _marketMin = pricing.marketMin;
+          _marketMax = pricing.marketMax;
+          _complexity = pricing.complexity;
         });
       }
     } catch (_) {
-      // Local heuristic fallback
       if (mounted) {
         setState(() {
           _minPrice = _materialCost * 1.5;
           _suggestedPrice = _materialCost * 2.5;
           _premiumPrice = _materialCost * 3.5;
           _selectedPrice = _suggestedPrice;
-          _b2bPrice = _selectedPrice * 0.85;
-          _competitorRange = '₹ ${_minPrice.toStringAsFixed(0)} - ₹ ${_premiumPrice.toStringAsFixed(0)}';
+          _b2bPrice = _selectedPrice * 0.75;
+          _competitorRange = '₹ ${_minPrice.toStringAsFixed(0)} – ₹ ${_premiumPrice.toStringAsFixed(0)}';
         });
       }
     } finally {
@@ -1016,19 +1026,105 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Complexity badge
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('B2B Wholesale Price (15% bulk off):', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      Text('₹ ${_b2bPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary, fontSize: 15)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _complexity == 'intricate'
+                              ? AppColors.primary.withValues(alpha: 0.12)
+                              : _complexity == 'moderate'
+                                  ? AppColors.accent.withValues(alpha: 0.15)
+                                  : AppColors.border,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Complexity: ${_complexity[0].toUpperCase()}${_complexity.substring(1)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _complexity == 'intricate'
+                                ? AppColors.primary
+                                : _complexity == 'moderate'
+                                    ? const Color(0xFFD68910)
+                                    : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      const Text('B2B Wholesale:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      const SizedBox(width: 6),
+                      Text('\u20b9 ${_b2bPrice.toStringAsFixed(0)}',
+                          style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary, fontSize: 15)),
                     ],
                   ),
-                  if (_competitorRange != null) ...[
+                  // Market range bar (only shown when platform data exists)
+                  if (_marketMin > 0 && _marketMax > 0) ...[
+                    const SizedBox(height: 14),
+                    Text('Platform Market Range', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final range = _marketMax - _marketMin;
+                        final selectedFraction = range > 0
+                            ? ((_selectedPrice - _marketMin) / range).clamp(0.0, 1.0)
+                            : 0.5;
+                        final avgFraction = range > 0
+                            ? ((_marketAvg - _marketMin) / range).clamp(0.0, 1.0)
+                            : 0.5;
+                        return Column(
+                          children: [
+                            Stack(
+                              children: [
+                                Container(
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [AppColors.success.withValues(alpha: 0.3), AppColors.primary.withValues(alpha: 0.5)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                // Avg marker
+                                Positioned(
+                                  left: constraints.maxWidth * avgFraction - 1,
+                                  child: Container(width: 2, height: 8, color: AppColors.accent),
+                                ),
+                                // Selected price marker
+                                Positioned(
+                                  left: (constraints.maxWidth * selectedFraction - 6).clamp(0.0, constraints.maxWidth - 12),
+                                  top: -3,
+                                  child: Container(
+                                    width: 14, height: 14,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('\u20b9 ${_marketMin.toStringAsFixed(0)}', style: AppTextStyles.caption.copyWith(fontSize: 10)),
+                                Text('Avg \u20b9 ${_marketAvg.toStringAsFixed(0)}', style: AppTextStyles.caption.copyWith(fontSize: 10, color: AppColors.accent)),
+                                Text('\u20b9 ${_marketMax.toStringAsFixed(0)}', style: AppTextStyles.caption.copyWith(fontSize: 10)),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ] else if (_competitorRange != null) ...[
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Marketplace Benchmark:', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                        const Text('Estimated Range:', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                         Text(_competitorRange!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                       ],
                     ),
