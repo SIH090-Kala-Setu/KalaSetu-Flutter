@@ -302,7 +302,7 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
     setState(() { _submitting = true; _error = null; });
     try {
       await ref.read(apiClientProvider).sendOtp(phone);
-      setState(() { _otpSent = true; _step = 3; });
+      setState(() { _step = 3; });
       _startResendTimer();
     } catch (e) {
       setState(() => _error = 'Failed to send OTP.');
