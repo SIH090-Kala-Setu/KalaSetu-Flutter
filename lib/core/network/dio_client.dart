@@ -25,8 +25,7 @@ final dioProvider = Provider<Dio>((ref) {
         // Always use the current override URL — this picks up any runtime change
         // made via ApiEndpoints.setBaseUrl() without needing a provider invalidation.
         final currentBase = ApiEndpoints.baseUrl;
-        if (!options.uri.isAbsolute) {
-          // Path is relative — prefix with the current base URL
+        if (!options.path.startsWith('http://') && !options.path.startsWith('https://')) {
           options.baseUrl = currentBase;
         }
 
@@ -37,19 +36,19 @@ final dioProvider = Provider<Dio>((ref) {
         }
 
         if (kDebugMode) {
-          debugPrint('🌐 [HTTP Request] ${options.method} ${options.baseUrl}${options.path}');
+          debugPrint('🌐 [HTTP Request] ${options.method} ${options.uri}');
         }
         return handler.next(options);
       },
       onResponse: (response, handler) {
         if (kDebugMode) {
-          debugPrint('✅ [HTTP Response ${response.statusCode}] ${response.requestOptions.path}');
+          debugPrint('✅ [HTTP Response ${response.statusCode}] ${response.requestOptions.uri}');
         }
         return handler.next(response);
       },
       onError: (DioException error, handler) async {
         if (kDebugMode) {
-          debugPrint('❌ [HTTP Error] ${error.requestOptions.path} => ${error.type} ${error.message} ${error.response?.data}');
+          debugPrint('❌ [HTTP Error] ${error.requestOptions.uri} => ${error.type} ${error.message} ${error.response?.data}');
         }
 
         if (error.response?.statusCode == 401) {

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/services/fcm_service.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_endpoints.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
@@ -95,6 +96,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onPressed: () => context.pop(),
         ),
         title: const Text('Login'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
+            tooltip: 'Configure Backend Server',
+            onPressed: () {
+              final controller = TextEditingController(text: ApiEndpoints.baseUrl);
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Backend API Server'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          labelText: 'Server Base URL',
+                          hintText: 'http://10.0.2.2:8000',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '• Android Emulator: http://10.0.2.2:8000\n• Physical Phone: http://<YOUR-PC-IP>:8000\n• Desktop / Web: http://127.0.0.1:8000',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        final val = controller.text.trim();
+                        if (val.isNotEmpty) {
+                          ApiEndpoints.setBaseUrl(val);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Target server set to: ${ApiEndpoints.baseUrl}')),
+                          );
+                        }
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

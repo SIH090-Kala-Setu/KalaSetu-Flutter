@@ -47,8 +47,8 @@
 Traditional government exhibitions (**Shilp Samagam**, **Surajkund Mela**, **Dilli Haat**) provide only brief, temporary sales windows. **कलाSetu** provides permanent digital continuity by serving as an autonomous **Virtual Business Manager** on the artisan's mobile device:
 
 * 📸 **Studio AI Enhancement**: Removes cluttered workshop backgrounds and optimizes studio lighting using lightweight edge models.
-* 🎙️ **Voice-to-Catalog in Native Tongues**: Transcribes voice recordings in 8 Indian languages and automatically generates bilingual English & Hindi product stories with SEO keywords via Gemini AI.
-* 💰 **Dynamic Fair Wage Pricing**: Computes fair hourly compensation (₹150/hr benchmark) and craft category multipliers (1.3× to 2.0×) to prevent middleman exploitation.
+* 🎙️ **Voice-to-Catalog in Native Tongues**: Transcribes voice recordings in 8 Indian languages and automatically generates bilingual English & Hindi product stories with SEO keywords via a multi-tier AI engine (Gemini 2.5 Flash + Groq Whisper & Llama 3.3 failover).
+* 💰 **Dynamic Fair Wage Pricing**: Computes fair hourly compensation (₹150/hr benchmark) and craft category multipliers (1.3× to 2.0×) blended with real-time AI market benchmarking.
 * 🔔 **Real-Time Push & Alert Engine**: Firebase Cloud Messaging (FCM v1) delivering instant alerts for KYC verifications, inventory stockouts, government welfare schemes, exhibition stall approvals, and buyer inquiry replies.
 * 🛍️ **Direct B2B Linkages**: Connects artisans directly to verified bulk buyers and export houses without commissions.
 * 🏛️ **MoSJE Governance & Cluster Aggregation**: Enables field aggregators to onboard illiterate artisans, broadcast welfare schemes, and relay reports to Ministry Administrators.
@@ -277,6 +277,8 @@ If no custom or environment URL is supplied, the client dynamically resolves:
 - **Windows Desktop / Web / iOS**: `http://127.0.0.1:8000`
 - **Android Emulator**: `http://10.0.2.2:8000` (maps to host `localhost:8000`)
 - **Physical Device over USB**: Run `adb reverse tcp:8000 tcp:8000` to forward device traffic to host `localhost:8000`.
+
+> **Note:** If products fail to load on localhost but work on the deployed URL, ensure you are running the latest `auth.py`. A bug where `get_current_user` raised `HTTP 401` on expired/invalid tokens (instead of returning `None`) caused the public `/products` endpoint to fail when a stale token from the deployed backend was present in storage. This is fixed — see the [Known Issues section in the backend README](../Kama-Setu/README.md#-known-issues--fixes).
 
 ---
 

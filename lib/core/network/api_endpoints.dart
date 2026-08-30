@@ -8,7 +8,31 @@ class ApiEndpoints {
 
   /// Allows setting a custom backend URL at runtime (e.g., from settings or env)
   static void setBaseUrl(String url) {
-    _overrideBaseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    var clean = url.trim();
+    if (clean.isEmpty) {
+      _overrideBaseUrl = '';
+      return;
+    }
+    // Prepend http:// if user omitted scheme
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = 'http://$clean';
+    }
+    // Strip trailing slashes
+    while (clean.endsWith('/')) {
+      clean = clean.substring(0, clean.length - 1);
+    }
+    // Auto-fix localhost for Android devices/emulators
+    if (!kIsWeb) {
+      try {
+        if (Platform.isAndroid) {
+          // If on Android and user typed localhost or 127.0.0.1, auto-map to 10.0.2.2
+          clean = clean
+              .replaceAll('://localhost', '://10.0.2.2')
+              .replaceAll('://127.0.0.1', '://10.0.2.2');
+        }
+      } catch (_) {}
+    }
+    _overrideBaseUrl = clean;
   }
 
   /// Dynamically resolves the active FastAPI backend base URL
@@ -20,7 +44,14 @@ class ApiEndpoints {
     // 1. Build-time environment variable (e.g. flutter build apk --dart-define=BACKEND_URL=https://api.yourdomain.com)
     const envUrl = String.fromEnvironment('BACKEND_URL');
     if (envUrl.isNotEmpty) {
-      return envUrl.endsWith('/') ? envUrl.substring(0, envUrl.length - 1) : envUrl;
+      var clean = envUrl.trim();
+      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+        clean = 'http://$clean';
+      }
+      while (clean.endsWith('/')) {
+        clean = clean.substring(0, clean.length - 1);
+      }
+      return clean;
     }
 
     // 2. Default local development fallbacks
@@ -29,10 +60,6 @@ class ApiEndpoints {
     }
     try {
       if (Platform.isAndroid) {
-        // 10.0.2.2 only works on Android Emulator.
-        // For physical devices, set BACKEND_URL at build time:
-        //   flutter run --dart-define=BACKEND_URL=http://192.168.x.x:8000
-        // or call ApiEndpoints.setBaseUrl() from a settings screen.
         return 'http://10.0.2.2:8000';
       }
     } catch (_) {}
