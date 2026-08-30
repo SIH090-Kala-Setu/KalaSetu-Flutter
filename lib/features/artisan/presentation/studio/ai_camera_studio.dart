@@ -1,13 +1,18 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../shared/models/product_model.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -34,26 +39,39 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   bool _showAfter = true;
 
   // Phase 3: Voice Cataloger
+  final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
+  Timer? _recordTimer;
   int _recordSeconds = 0;
+  String? _recordedAudioPath;
   bool _isCataloging = false;
+  final _manualPromptController = TextEditingController();
   final _titleEnController = TextEditingController();
   final _titleHiController = TextEditingController();
   final _descEnController = TextEditingController();
   final _descHiController = TextEditingController();
   String _craftCategory = 'Textiles & Handloom';
-  List<String> _tags = ['#Handmade', '#Silk', '#Varanasi', '#MoSJE'];
+  List<String> _tags = ['#HandmadeInIndia', '#VocalForLocal', '#MoSJE'];
+  List<String> _materials = ['Natural Materials'];
 
   // Phase 4: Pricing Assistant
   double _materialCost = 450.0;
+  double _manufacturingHours = 4.0;
   double _minPrice = 650.0;
   double _suggestedPrice = 1200.0;
   double _premiumPrice = 1800.0;
   double _selectedPrice = 1200.0;
+  double _b2bPrice = 1020.0;
+  String _pricingNotes = 'Calculated using fair wage multiplier and raw material costs.';
+  String? _competitorRange = '₹ 1,000 - ₹ 1,800';
+  bool _isCalculatingPricing = false;
   bool _isListing = false;
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
+    _audioRecorder.dispose();
+    _manualPromptController.dispose();
     _titleEnController.dispose();
     _titleHiController.dispose();
     _descEnController.dispose();
@@ -63,7 +81,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
 
   // --- Phase 1 Handlers ---
   void _pickFromCamera() async {
-    final photo = await _picker.pickImage(source: ImageSource.camera);
+    final photo = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
     if (photo != null) {
       setState(() {
         _capturedImage = File(photo.path);
@@ -74,7 +92,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   }
 
   void _pickFromGallery() async {
-    final photo = await _picker.pickImage(source: ImageSource.gallery);
+    final photo = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
     if (photo != null) {
       setState(() {
         _capturedImage = File(photo.path);
@@ -91,9 +109,8 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
       _enhanceStep = 0;
     });
 
-    await Future.delayed(const Duration(milliseconds: 700));
+    await Future.delayed(const Duration(milliseconds: 500));
     if (mounted) setState(() => _enhanceStep = 1);
-    await Future.delayed(const Duration(milliseconds: 700));
 
     try {
       if (_capturedImage != null) {
@@ -108,7 +125,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
         }
       }
     } catch (_) {
-      // Mock enhanced bytes fallback for offline testing
       if (mounted) {
         setState(() {
           _enhancedBytes = _capturedImage?.readAsBytesSync();
@@ -119,69 +135,166 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
     }
   }
 
-  // --- Phase 3 Handlers ---
+  // --- Phase 3 Handlers (Voice & STT) ---
   void _toggleRecording() async {
     if (!_isRecording) {
-      setState(() {
-        _isRecording = true;
-        _recordSeconds = 0;
-      });
+      try {
+        final hasPerm = await _audioRecorder.hasPermission();
+        if (!hasPerm) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Microphone permission required for voice notes.')),
+            );
+          }
+          return;
+        }
 
-      // Simulate recording timer
-      for (int i = 1; i <= 5; i++) {
-        await Future.delayed(const Duration(seconds: 1));
-        if (mounted && _isRecording) {
-          setState(() => _recordSeconds = i);
+        final tempDir = await getTemporaryDirectory();
+        final path = '${tempDir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100),
+          path: path,
+        );
+
+        setState(() {
+          _isRecording = true;
+          _recordSeconds = 0;
+          _recordedAudioPath = path;
+        });
+
+        _recordTimer?.cancel();
+        _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+          setState(() => _recordSeconds++);
+          if (_recordSeconds >= 60) {
+            _toggleRecording();
+          }
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not start recording: $e')),
+          );
         }
       }
     } else {
-      setState(() => _isRecording = false);
-      _generateCatalog();
+      _recordTimer?.cancel();
+      try {
+        final path = await _audioRecorder.stop();
+        setState(() {
+          _isRecording = false;
+          if (path != null) _recordedAudioPath = path;
+        });
+
+        if (_recordedAudioPath != null) {
+          _generateCatalogFromAudio(File(_recordedAudioPath!));
+        }
+      } catch (e) {
+        setState(() => _isRecording = false);
+      }
     }
   }
 
-  void _generateCatalog() async {
+  Future<void> _generateCatalogFromAudio(File audioFile) async {
     setState(() => _isCataloging = true);
 
     try {
       final apiClient = ref.read(apiClientProvider);
-      final catalog = await apiClient.generateCatalog(
-        textDesc: 'Authentic pure mulberry silk handwoven Banarasi saree with intricate gold zari brocade work.',
+      final catalog = await apiClient.generateCatalog(audioFile: audioFile);
+      _applyCatalogResult(catalog);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Voice processing error: $e. You can also type a description below.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCataloging = false);
+    }
+  }
+
+  Future<void> _generateCatalogFromText() async {
+    final text = _manualPromptController.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please speak or type a short description first.')),
+      );
+      return;
+    }
+
+    setState(() => _isCataloging = true);
+
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final catalog = await apiClient.generateCatalog(textDesc: text);
+      _applyCatalogResult(catalog);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Catalog generation error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCataloging = false);
+    }
+  }
+
+  void _applyCatalogResult(ProductCatalogGenerated catalog) {
+    if (!mounted) return;
+    setState(() {
+      if (catalog.titleEn.isNotEmpty) _titleEnController.text = catalog.titleEn;
+      if (catalog.titleHi.isNotEmpty) _titleHiController.text = catalog.titleHi;
+      if (catalog.descriptionEn.isNotEmpty) _descEnController.text = catalog.descriptionEn;
+      if (catalog.descriptionHi.isNotEmpty) _descHiController.text = catalog.descriptionHi;
+      if (catalog.craftCategory.isNotEmpty) _craftCategory = catalog.craftCategory;
+      if (catalog.suggestedTags.isNotEmpty) _tags = catalog.suggestedTags;
+      if (catalog.primaryMaterial.isNotEmpty) _materials = [catalog.primaryMaterial];
+    });
+  }
+
+  // --- Phase 4 Handlers (Pricing Assistant) ---
+  Future<void> _fetchDynamicPricing() async {
+    setState(() => _isCalculatingPricing = true);
+
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final pricing = await apiClient.suggestPrice(
+        category: _craftCategory,
+        materialCost: _materialCost,
+        manufacturingHours: _manufacturingHours,
+        productDescription: _descEnController.text.isNotEmpty ? _descEnController.text : _titleEnController.text,
       );
 
       if (mounted) {
         setState(() {
-          _titleEnController.text = catalog.titleEn.isNotEmpty ? catalog.titleEn : 'Pure Silk Handwoven Banarasi Saree';
-          _titleHiController.text = catalog.titleHi.isNotEmpty ? catalog.titleHi : 'शुद्ध रेशम हथकरघा बनारसी साड़ी';
-          _descEnController.text = catalog.descriptionEn.isNotEmpty ? catalog.descriptionEn : 'Handcrafted by master weavers in Varanasi using traditional pit looms and pure gold zari threads.';
-          _descHiController.text = catalog.descriptionHi.isNotEmpty ? catalog.descriptionHi : 'पारंपरिक गड्ढा करघे और शुद्ध सोने के ज़री धागों का उपयोग करके वाराणसी के मास्टर बुनकरों द्वारा हस्तनिर्मित।';
-          _craftCategory = catalog.craftCategory;
-          _tags = catalog.suggestedTags.isNotEmpty ? catalog.suggestedTags : ['#Handloom', '#Silk', '#Varanasi', '#Zari'];
-          _isCataloging = false;
+          _minPrice = pricing.minimumBreakevenPrice;
+          _suggestedPrice = pricing.suggestedRetailPrice;
+          _premiumPrice = _suggestedPrice * 1.35;
+          _selectedPrice = _suggestedPrice;
+          _b2bPrice = pricing.suggestedB2BPrice > 0 ? pricing.suggestedB2BPrice : (_selectedPrice * 0.85);
+          _pricingNotes = pricing.explanation;
+          _competitorRange = pricing.competitorRange ?? '₹ ${(_minPrice * 0.9).toStringAsFixed(0)} - ₹ ${(_premiumPrice).toStringAsFixed(0)}';
         });
       }
     } catch (_) {
+      // Local heuristic fallback
       if (mounted) {
         setState(() {
-          _titleEnController.text = 'Pure Silk Handwoven Banarasi Saree';
-          _titleHiController.text = 'शुद्ध रेशम हथकरघा बनारसी साड़ी';
-          _descEnController.text = 'Handcrafted by master weavers in Varanasi using traditional pit looms and pure gold zari threads.';
-          _descHiController.text = 'पारंपरिक गड्ढा करघे और शुद्ध सोने के ज़री धागों का उपयोग करके वाराणसी के मास्टर बुनकरों द्वारा हस्तनिर्मित।';
-          _tags = ['#Handloom', '#Silk', '#Varanasi', '#Zari'];
-          _isCataloging = false;
+          _minPrice = _materialCost * 1.5;
+          _suggestedPrice = _materialCost * 2.5;
+          _premiumPrice = _materialCost * 3.5;
+          _selectedPrice = _suggestedPrice;
+          _b2bPrice = _selectedPrice * 0.85;
+          _competitorRange = '₹ ${_minPrice.toStringAsFixed(0)} - ₹ ${_premiumPrice.toStringAsFixed(0)}';
         });
       }
+    } finally {
+      if (mounted) setState(() => _isCalculatingPricing = false);
     }
-  }
-
-  // --- Phase 4 Handlers ---
-  void _calculatePricing() {
-    setState(() {
-      _minPrice = _materialCost * 1.5;
-      _suggestedPrice = _materialCost * 2.6;
-      _premiumPrice = _materialCost * 3.8;
-      _selectedPrice = _suggestedPrice;
-    });
   }
 
   void _onListProduct() async {
@@ -189,24 +302,35 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
 
     try {
       final apiClient = ref.read(apiClientProvider);
+
+      // Encode image bytes as base64 data URI
+      String? base64Image;
+      if (_enhancedBytes != null && _enhancedBytes!.isNotEmpty) {
+        base64Image = 'data:image/png;base64,${base64Encode(_enhancedBytes!)}';
+      } else if (_capturedImage != null && _capturedImage!.existsSync()) {
+        final bytes = await _capturedImage!.readAsBytes();
+        base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      }
+
       await apiClient.createProduct(
-        titleEn: _titleEnController.text.trim().isNotEmpty ? _titleEnController.text.trim() : 'Artisan Handcrafted Piece',
-        titleHi: _titleHiController.text.trim().isNotEmpty ? _titleHiController.text.trim() : 'हस्तनिर्मित शिल्प',
-        descriptionEn: _descEnController.text.trim(),
-        descriptionHi: _descHiController.text.trim(),
+        titleEn: _titleEnController.text.trim().isNotEmpty ? _titleEnController.text.trim() : 'Artisan Handcrafted Creation',
+        titleHi: _titleHiController.text.trim().isNotEmpty ? _titleHiController.text.trim() : 'हस्तनिर्मित शिल्प उत्पाद',
+        descriptionEn: _descEnController.text.trim().isNotEmpty ? _descEnController.text.trim() : null,
+        descriptionHi: _descHiController.text.trim().isNotEmpty ? _descHiController.text.trim() : null,
         category: _craftCategory,
-        materials: ['Silk', 'Gold Zari'],
+        materials: _materials.isNotEmpty ? _materials : ['Natural Materials'],
         tags: _tags,
         retailPrice: _selectedPrice,
-        b2bPrice: _selectedPrice * 0.75, // 25% wholesale discount for bulk B2B
+        b2bPrice: _b2bPrice > 0 ? _b2bPrice : (_selectedPrice * 0.85),
         stock: 10,
+        imageUrl: base64Image,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: AppColors.success,
-            content: Text('🎉 Product successfully published to National Marketplace!'),
+            content: Text('🎉 Product successfully published with enhanced photo to Marketplace!'),
           ),
         );
         context.go('/artisan/catalog');
@@ -214,12 +338,11 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: AppColors.success,
-            content: Text('🎉 Product successfully published to National Marketplace!'),
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to publish product: $e'),
           ),
         );
-        context.go('/artisan/catalog');
       }
     } finally {
       if (mounted) setState(() => _isListing = false);
@@ -330,7 +453,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   Widget _buildPhase1Capture(AppLocalizations l10n) {
     return Stack(
       children: [
-        // Camera Viewfinder Canvas
         Container(
           width: double.infinity,
           height: double.infinity,
@@ -353,7 +475,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
             ),
           ),
         ),
-        // Top Controls
         Positioned(
           top: 16,
           right: 16,
@@ -365,7 +486,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
             ),
           ),
         ),
-        // Bottom Capture Controls
         Positioned(
           bottom: 24,
           left: 0,
@@ -373,7 +493,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Gallery import
               CircleAvatar(
                 radius: 26,
                 backgroundColor: Colors.white24,
@@ -382,7 +501,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                   onPressed: _pickFromGallery,
                 ),
               ),
-              // 72px Large Shutter Button
               GestureDetector(
                 onTap: _pickFromCamera,
                 child: Container(
@@ -405,7 +523,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                   ),
                 ),
               ),
-              // Placeholder for symmetry
               const SizedBox(width: 52),
             ],
           ),
@@ -434,10 +551,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              Text(
-                'AI Studio Processing',
-                style: AppTextStyles.heading,
-              ),
+              Text('AI Studio Processing', style: AppTextStyles.heading),
               const SizedBox(height: 16),
               _buildProgressStep('Removing background with u2netp...', _enhanceStep >= 0),
               _buildProgressStep('Balancing edge studio lighting...', _enhanceStep >= 1),
@@ -453,7 +567,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Quality Score Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -468,7 +581,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                     Icon(Icons.check_circle, color: AppColors.success, size: 16),
                     SizedBox(width: 6),
                     Text(
-                      'Studio Quality Score: 92/100',
+                      'Studio Quality: Enhanced',
                       style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                   ],
@@ -482,7 +595,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          // Before / After Preview Box
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -515,7 +627,6 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                   label: l10n.useThisPhoto,
                   onPressed: () {
                     setState(() => _currentPhase = 3);
-                    _generateCatalog();
                   },
                 ),
               ),
@@ -550,7 +661,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   }
 
   // ==========================================
-  // PHASE 3: VOICE CATALOGER
+  // PHASE 3: VOICE & TEXT MULTILINGUAL CATALOGER
   // ==========================================
   Widget _buildPhase3VoiceCataloger(AppLocalizations l10n) {
     return SingleChildScrollView(
@@ -564,17 +675,18 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Speak naturally in your regional language. Gemini AI will generate English and Hindi descriptions.',
+            'Speak naturally in your regional language or enter keywords. Gemini AI will generate professional English & Hindi descriptions.',
             style: AppTextStyles.caption.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 20),
-          // Pulsing Microphone Card
+
+          // Microphone Voice Recording Card
           AppCard(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             child: Column(
               children: [
                 GestureDetector(
-                  onTap: _toggleRecording,
+                  onTap: _isCataloging ? null : _toggleRecording,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 74,
@@ -600,24 +712,78 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _isRecording ? '00:0$_recordSeconds / 01:00 — Recording' : l10n.speakNow,
+                  _isRecording
+                      ? 'Recording... 00:${_recordSeconds.toString().padLeft(2, '0')} / 01:00 (Tap to stop)'
+                      : 'Tap mic to describe your craft (Hindi, Tamil, Bengali, etc.)',
                   style: AppTextStyles.body.copyWith(
                     fontWeight: FontWeight.w700,
                     color: _isRecording ? AppColors.error : AppColors.textPrimary,
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Manual text prompt option
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Or type keywords / description:',
+                  style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _manualPromptController,
+                  decoration: const InputDecoration(
+                    hintText: 'e.g. Handmade terracotta vase with floral warli painting...',
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: _isCataloging ? null : _generateCatalogFromText,
+                    icon: const Icon(Icons.auto_awesome, size: 16),
+                    label: const Text('✨ AI Auto-Catalog'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: 20),
+
           if (_isCataloging) ...[
             const Center(
-              child: Column(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 12),
-                  Text('Translating voice & writing bilingual description...'),
-                ],
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 12),
+                    Text('Translating voice & creating bilingual e-commerce catalog...'),
+                  ],
+                ),
               ),
             ),
           ] else ...[
@@ -625,44 +791,62 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
             AppTextField(
               controller: _titleEnController,
               label: l10n.titleEn,
+              hint: 'e.g. Handcrafted Terracotta Floral Vase',
             ),
             const SizedBox(height: 12),
             AppTextField(
               controller: _titleHiController,
               label: l10n.titleHi,
+              hint: 'उदा. हस्तनिर्मित टेराकोटा मिट्टी का फूलदान',
             ),
             const SizedBox(height: 12),
+
             // Description fields
             AppTextField(
               controller: _descEnController,
               label: l10n.descEn,
+              hint: 'English description highlighting artisanal heritage...',
               maxLines: 3,
             ),
             const SizedBox(height: 12),
             AppTextField(
               controller: _descHiController,
               label: l10n.descHi,
+              hint: 'शिल्प और निर्माण तकनीक का हिंदी में विवरण...',
               maxLines: 3,
             ),
             const SizedBox(height: 14),
-            // Tags
-            Text(l10n.tags, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600)),
+
+            // Category & Tags
+            Row(
+              children: [
+                const Icon(Icons.category, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  'Category: $_craftCategory',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
+              runSpacing: 4,
               children: _tags
                   .map((t) => Chip(
-                        label: Text(t, style: const TextStyle(fontSize: 12)),
+                        label: Text(t, style: const TextStyle(fontSize: 11)),
                         backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                        visualDensity: VisualDensity.compact,
                       ))
                   .toList(),
             ),
+
             const SizedBox(height: 24),
             AppButton(
               label: 'Proceed to Pricing Assistant',
               onPressed: () {
-                _calculatePricing();
                 setState(() => _currentPhase = 4);
+                _fetchDynamicPricing();
               },
             ),
           ],
@@ -690,89 +874,193 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
             style: AppTextStyles.caption.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 20),
-          // 3-Tier Price Cards
-          Row(
-            children: [
-              Expanded(
-                child: _buildPriceCard(
-                  title: 'Minimum',
-                  price: _minPrice,
-                  subtitle: 'Fair Wage',
-                  isSelected: _selectedPrice == _minPrice,
-                  color: Colors.grey,
-                  onTap: () => setState(() => _selectedPrice = _minPrice),
+
+          if (_isCalculatingPricing) ...[
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 12),
+                    Text('Analyzing market trends & calculating fair pricing...'),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildPriceCard(
-                  title: 'Suggested ★',
-                  price: _suggestedPrice,
-                  subtitle: 'Market Match',
-                  isSelected: _selectedPrice == _suggestedPrice,
-                  color: AppColors.accent,
-                  onTap: () => setState(() => _selectedPrice = _suggestedPrice),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildPriceCard(
-                  title: 'Premium',
-                  price: _premiumPrice,
-                  subtitle: 'Heritage Retail',
-                  isSelected: _selectedPrice == _premiumPrice,
-                  color: const Color(0xFF1ABC9C),
-                  onTap: () => setState(() => _selectedPrice = _premiumPrice),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          // Raw Material Cost Input
-          Text(l10n.materialCost, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          TextField(
-            keyboardType: TextInputType.number,
-            style: AppTextStyles.heading,
-            decoration: InputDecoration(
-              prefixText: '₹ ',
-              hintText: '450',
-              filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onChanged: (val) {
-              final parsed = double.tryParse(val);
-              if (parsed != null && parsed > 0) {
-                setState(() => _materialCost = parsed);
-                _calculatePricing();
-              }
-            },
-          ),
-          const SizedBox(height: 20),
-          // Expandable Explanation Card
-          AppCard(
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: Text(l10n.howCalculated, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600)),
+          ] else ...[
+            // 3-Tier Price Cards
+            Row(
               children: [
-                const SizedBox(height: 8),
-                Text(
-                  '• Raw Material Base: ₹ ${_materialCost.toStringAsFixed(0)}\n'
-                  '• Artisan Craft Multiplier (Textiles): 2.6x\n'
-                  '• Estimated Net Profit Margin: 45% (₹ ${(_selectedPrice - _materialCost).toStringAsFixed(0)})\n'
-                  '• Suggested B2B Wholesale: ₹ ${(_selectedPrice * 0.75).toStringAsFixed(0)} (25% volume discount)',
-                  style: AppTextStyles.caption.copyWith(height: 1.5, fontSize: 13),
+                Expanded(
+                  child: _buildPriceCard(
+                    title: 'Minimum',
+                    price: _minPrice,
+                    subtitle: 'Fair Wage Floor',
+                    isSelected: _selectedPrice == _minPrice,
+                    color: Colors.grey,
+                    onTap: () => setState(() {
+                      _selectedPrice = _minPrice;
+                      _b2bPrice = _minPrice * 0.85;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildPriceCard(
+                    title: 'Suggested ★',
+                    price: _suggestedPrice,
+                    subtitle: 'Market Match',
+                    isSelected: _selectedPrice == _suggestedPrice,
+                    color: AppColors.accent,
+                    onTap: () => setState(() {
+                      _selectedPrice = _suggestedPrice;
+                      _b2bPrice = _suggestedPrice * 0.85;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildPriceCard(
+                    title: 'Premium',
+                    price: _premiumPrice,
+                    subtitle: 'Heritage Retail',
+                    isSelected: _selectedPrice == _premiumPrice,
+                    color: const Color(0xFF1ABC9C),
+                    onTap: () => setState(() {
+                      _selectedPrice = _premiumPrice;
+                      _b2bPrice = _premiumPrice * 0.85;
+                    }),
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 32),
-          AppButton(
-            label: l10n.listProduct,
-            isLoading: _isListing,
-            onPressed: _onListProduct,
-          ),
+            const SizedBox(height: 24),
+
+            // Raw Material Cost Input & Hours
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.materialCost, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        keyboardType: TextInputType.number,
+                        style: AppTextStyles.heading.copyWith(fontSize: 16),
+                        decoration: InputDecoration(
+                          prefixText: '₹ ',
+                          hintText: '450',
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        controller: TextEditingController(text: _materialCost.toStringAsFixed(0))
+                          ..selection = TextSelection.collapsed(offset: _materialCost.toStringAsFixed(0).length),
+                        onSubmitted: (val) {
+                          final parsed = double.tryParse(val);
+                          if (parsed != null && parsed > 0) {
+                            setState(() => _materialCost = parsed);
+                            _fetchDynamicPricing();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Labor Hours', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        keyboardType: TextInputType.number,
+                        style: AppTextStyles.heading.copyWith(fontSize: 16),
+                        decoration: InputDecoration(
+                          suffixText: 'hrs',
+                          hintText: '4',
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        controller: TextEditingController(text: _manufacturingHours.toStringAsFixed(1))
+                          ..selection = TextSelection.collapsed(offset: _manufacturingHours.toStringAsFixed(1).length),
+                        onSubmitted: (val) {
+                          final parsed = double.tryParse(val);
+                          if (parsed != null && parsed > 0) {
+                            setState(() => _manufacturingHours = parsed);
+                            _fetchDynamicPricing();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Wholesale & Competitor Summary Box
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('B2B Wholesale Price (15% bulk off):', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text('₹ ${_b2bPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary, fontSize: 15)),
+                    ],
+                  ),
+                  if (_competitorRange != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Marketplace Benchmark:', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                        Text(_competitorRange!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Strategy notes card
+            AppCard(
+              child: ExpansionTile(
+                initiallyExpanded: true,
+                tilePadding: EdgeInsets.zero,
+                title: Text(l10n.howCalculated, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, fontSize: 14)),
+                children: [
+                  Text(
+                    _pricingNotes,
+                    style: AppTextStyles.caption.copyWith(height: 1.5, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            AppButton(
+              label: l10n.listProduct,
+              isLoading: _isListing,
+              onPressed: _onListProduct,
+            ),
+          ],
         ],
       ),
     );

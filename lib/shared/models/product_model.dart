@@ -101,15 +101,29 @@ class ProductCatalogGenerated {
   });
 
   factory ProductCatalogGenerated.fromJson(Map<String, dynamic> json) {
+    List<String> tagsList = [];
+    if (json['tags'] is List) {
+      tagsList = (json['tags'] as List).map((e) => e.toString()).toList();
+    } else if (json['suggested_tags'] is List) {
+      tagsList = (json['suggested_tags'] as List).map((e) => e.toString()).toList();
+    }
+
+    String materialStr = 'Natural';
+    if (json['materials'] is List && (json['materials'] as List).isNotEmpty) {
+      materialStr = (json['materials'] as List).map((e) => e.toString()).join(', ');
+    } else if (json['primary_material'] != null) {
+      materialStr = json['primary_material'].toString();
+    }
+
     return ProductCatalogGenerated(
       titleEn: json['title_en']?.toString() ?? '',
       titleHi: json['title_hi']?.toString() ?? '',
       descriptionEn: json['description_en']?.toString() ?? '',
       descriptionHi: json['description_hi']?.toString() ?? '',
-      craftCategory: json['craft_category']?.toString() ?? 'Handicrafts',
-      primaryMaterial: json['primary_material']?.toString() ?? 'Natural',
-      suggestedTags: (json['suggested_tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      transcribedText: json['transcribed_text']?.toString(),
+      craftCategory: json['category']?.toString() ?? json['craft_category']?.toString() ?? 'Handicrafts',
+      primaryMaterial: materialStr,
+      suggestedTags: tagsList,
+      transcribedText: json['raw_transcription']?.toString() ?? json['transcribed_text']?.toString(),
     );
   }
 }
@@ -120,6 +134,7 @@ class PriceBreakdownModel {
   final double minimumBreakevenPrice;
   final double estimatedProfitMargin;
   final String explanation;
+  final String? competitorRange;
 
   PriceBreakdownModel({
     required this.suggestedRetailPrice,
@@ -127,15 +142,23 @@ class PriceBreakdownModel {
     required this.minimumBreakevenPrice,
     required this.estimatedProfitMargin,
     required this.explanation,
+    this.competitorRange,
   });
 
   factory PriceBreakdownModel.fromJson(Map<String, dynamic> json) {
+    final baseMat = (json['base_material_cost'] ?? 0).toDouble();
+    final labor = (json['labor_cost'] ?? 0).toDouble();
+    final minPrice = (json['minimum_breakeven_price'] ?? json['min_price'] ?? (baseMat + labor)).toDouble();
+    final retail = (json['suggested_retail_price'] ?? json['suggested_price'] ?? (minPrice * 1.5)).toDouble();
+    final b2b = (json['suggested_b2b_price'] ?? json['b2b_price'] ?? (retail * 0.85)).toDouble();
+
     return PriceBreakdownModel(
-      suggestedRetailPrice: (json['suggested_retail_price'] ?? json['suggested_price'] ?? 0).toDouble(),
-      suggestedB2BPrice: (json['suggested_b2b_price'] ?? json['b2b_price'] ?? 0).toDouble(),
-      minimumBreakevenPrice: (json['minimum_breakeven_price'] ?? json['min_price'] ?? 0).toDouble(),
-      estimatedProfitMargin: (json['estimated_profit_margin_percent'] ?? json['profit_margin'] ?? 25).toDouble(),
-      explanation: json['explanation']?.toString() ?? 'Calculated using fair wage multiplier and raw material costs.',
+      suggestedRetailPrice: retail,
+      suggestedB2BPrice: b2b,
+      minimumBreakevenPrice: minPrice > 0 ? minPrice : (retail * 0.7),
+      estimatedProfitMargin: (json['estimated_profit_margin_percent'] ?? json['profit_margin'] ?? 30).toDouble(),
+      explanation: json['pricing_strategy_notes']?.toString() ?? json['explanation']?.toString() ?? 'Calculated using fair wage multiplier and raw material costs.',
+      competitorRange: json['competitor_range']?.toString(),
     );
   }
 }

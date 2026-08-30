@@ -23,6 +23,7 @@ dependencies:
   camera: any
   image_cropper: any
   record: any
+  path_provider: any
   just_audio: any
   intl: any
   logger: any

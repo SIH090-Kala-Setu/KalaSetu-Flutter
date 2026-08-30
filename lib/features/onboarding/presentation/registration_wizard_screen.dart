@@ -75,7 +75,6 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
   
   // ── OTP State ─────────────────────────────────────────────────────────────
   final _otpCtrl = TextEditingController();
-  bool _otpSent = false;
 
   // ── Form state ───────────────────────────────────────────────────────────
   String _langCode = 'en';
@@ -129,6 +128,7 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
     // Trigger rebuilds when name/phone change so Continue button re-evaluates
     _nameCtrl.addListener(() => setState(() {}));
     _phoneCtrl.addListener(() => setState(() {}));
+    _districtCtrl.addListener(() => setState(() {}));
     _passwordCtrl.addListener(() => setState(() {}));
     _confirmCtrl.addListener(() => setState(() {}));
   }
@@ -148,24 +148,21 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
     super.dispose();
   }
 
-  void _goStep(int s) => setState(() {
-        _step = s;
-        _error = null;
-      });
 
   void _next() {
     _error = null;
     if (_step == 4) {
-      // After role: Artisan → step 4 (craft), others → step 5 (location)
+      // After role: Artisan → step 5 (craft), others → step 6 (location)
       setState(() => _step = _role == 'Artisan' ? 5 : 6);
-    } else if (_step == 6) {
-      setState(() => _step = 6);
       if (_role == 'Aggregator') _loadClusters();
+    } else if (_step == 5 && _role != 'Artisan') {
+      // Non-artisan skip craft, shouldn't reach here but guard anyway
+      setState(() => _step = 6);
     } else {
       setState(() => _step++);
     }
 
-    // Load clusters when entering step 5 as Aggregator
+    // Load clusters when entering step 6 as Aggregator
     if (_step == 6 && _role == 'Aggregator') _loadClusters();
   }
 
@@ -845,7 +842,23 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
         const SizedBox(height: 28),
         AppButton(
           label: 'Continue',
-          onPressed: _state.isNotEmpty && _districtCtrl.text.trim().isNotEmpty ? _next : null,
+          onPressed: () {
+            final district = _districtCtrl.text.trim();
+            if (_state.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select your state')),
+              );
+              return;
+            }
+            if (district.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter your district')),
+              );
+              return;
+            }
+            _district = district;
+            _next();
+          },
         ),
       ],
     );
