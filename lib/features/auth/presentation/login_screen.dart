@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/services/fcm_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -60,6 +61,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             fullName: name,
             phone: username,
           );
+
+      // Register FCM token with backend after successful login
+      await FcmService.instance.init(ref);
 
       if (mounted) {
         if (role == 'Aggregator') {

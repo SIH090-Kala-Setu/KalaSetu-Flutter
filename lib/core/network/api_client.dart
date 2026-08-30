@@ -177,10 +177,10 @@ class ApiClient {
   }) async {
     final queryParams = <String, dynamic>{};
     if (craft != null && craft.isNotEmpty && craft != 'All') {
-      queryParams['craft'] = craft;
+      queryParams['category'] = craft;
     }
     if (state != null && state.isNotEmpty) {
-      queryParams['state'] = state;
+      queryParams['region'] = state;
     }
     if (minPrice != null) {
       queryParams['min_price'] = minPrice;
@@ -317,6 +317,10 @@ class ApiClient {
   // ==========================================
   // NOTIFICATIONS (Module 8)
   // ==========================================
+
+  Future<void> registerFcmToken(String token) async {
+    await _dio.post('/auth/fcm-token', data: {'fcm_token': token});
+  }
 
   Future<List<AppNotificationModel>> getNotifications() async {
     final response = await _dio.get(ApiEndpoints.notifications);

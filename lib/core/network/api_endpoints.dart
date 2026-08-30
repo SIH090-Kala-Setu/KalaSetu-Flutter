@@ -29,8 +29,10 @@ class ApiEndpoints {
     }
     try {
       if (Platform.isAndroid) {
-        // In Android Emulator, 10.0.2.2 points to host PC localhost:8000.
-        // For physical device, use adb reverse or LAN IP.
+        // 10.0.2.2 only works on Android Emulator.
+        // For physical devices, set BACKEND_URL at build time:
+        //   flutter run --dart-define=BACKEND_URL=http://192.168.x.x:8000
+        // or call ApiEndpoints.setBaseUrl() from a settings screen.
         return 'http://10.0.2.2:8000';
       }
     } catch (_) {}

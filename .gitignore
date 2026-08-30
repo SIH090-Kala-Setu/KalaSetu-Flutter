@@ -36,10 +36,20 @@ android/gradlew.bat
 android/local.properties
 android/**/GeneratedPluginRegistrant.java
 android/key.properties
+android/app/google-services.json
+**/google-services.json
 *.jks
 *.keystore
 *.apk
 *.aab
+
+# ==============================================================================
+# Firebase & Cloud Credentials
+# ==============================================================================
+*google-services.json
+*GoogleService-Info.plist
+*firebase-credentials*.json
+*serviceAccountKey*.json
 
 # ==============================================================================
 # iOS / Xcode Specific

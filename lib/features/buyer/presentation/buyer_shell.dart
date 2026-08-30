@@ -65,7 +65,7 @@ class BuyerShell extends StatelessWidget {
             BottomNavigationBarItem(
               icon: Icon(Icons.business_outlined),
               activeIcon: Icon(Icons.business),
-              label: 'Enterprise Profile',
+              label: 'Profile',
             ),
           ],
         ),

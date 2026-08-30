@@ -19,6 +19,7 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
   final _searchController = TextEditingController();
   String _selectedCraft = 'All';
   bool _isLoading = true;
+  bool _hasError = false;
   List<ProductModel> _products = [];
 
   final List<String> _craftCategories = [
@@ -43,21 +44,13 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
   }
 
   void _fetchMarketplaceProducts() async {
+    setState(() { _isLoading = true; _hasError = false; });
     try {
       final apiClient = ref.read(apiClientProvider);
       final list = await apiClient.getProducts(craft: _selectedCraft);
-      if (mounted) {
-        setState(() {
-          _products = list;
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _products = list; _isLoading = false; });
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _isLoading = false; _hasError = true; });
     }
   }
 
@@ -83,14 +76,14 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
         title: const Text('KalaSetu B2B Marketplace'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchMarketplaceProducts,
+          ),
+          IconButton(
             icon: const Icon(Icons.tune),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Filter by state, price bracket, and MoSJE badge',
-                  ),
-                ),
+                const SnackBar(content: Text('Filter by state, price bracket, and MoSJE badge')),
               );
             },
           ),
@@ -163,7 +156,27 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                     padding: EdgeInsets.all(16.0),
                     child: ShimmerGridLoader(itemCount: 4),
                   )
-                : GridView.builder(
+                : _hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.wifi_off, size: 48, color: AppColors.textDisabled),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Could not load products.\nCheck your network or backend URL.',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton.icon(
+                              onPressed: _fetchMarketplaceProducts,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
                     padding: const EdgeInsets.all(16),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(

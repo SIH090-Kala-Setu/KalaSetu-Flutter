@@ -23,6 +23,7 @@ class CatalogScreen extends ConsumerStatefulWidget {
 class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   String _selectedFilter = 'All';
   bool _isLoading = true;
+  bool _hasError = false;
   List<ProductModel> _products = [];
 
   final List<String> _filters = ['All', 'Active', 'Draft', 'Sold Out'];
@@ -34,6 +35,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   void _fetchProducts() async {
+    setState(() { _isLoading = true; _hasError = false; });
     try {
       final apiClient = ref.read(apiClientProvider);
       final list = await apiClient.getProducts();
@@ -47,6 +49,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasError = true;
         });
       }
     }
@@ -240,6 +243,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       appBar: AppBar(
         title: Text(l10n.myCatalogue),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchProducts,
+          ),
           if (_products.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.qr_code_2),
@@ -294,7 +301,29 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                     padding: EdgeInsets.all(16.0),
                     child: ShimmerGridLoader(itemCount: 4),
                   )
-                : _filteredProducts.isEmpty
+                : _hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.wifi_off, size: 48, color: AppColors.textDisabled),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Could not reach backend.\nCheck your network or backend URL.',
+                              style: AppTextStyles.caption,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            AppButton(
+                              label: 'Retry',
+                              icon: Icons.refresh,
+                              variant: AppButtonVariant.outlined,
+                              onPressed: _fetchProducts,
+                            ),
+                          ],
+                        ),
+                      )
+                    : _filteredProducts.isEmpty
                     ? EmptyStateWidget(
                         title: 'No products found',
                         message: 'Add your first product using the AI Camera Studio.',

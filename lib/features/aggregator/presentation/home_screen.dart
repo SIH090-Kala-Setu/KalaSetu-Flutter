@@ -40,6 +40,7 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
   }
 
   void _fetchDashboard() async {
+    setState(() => _isLoading = true);
     try {
       final apiClient = ref.read(apiClientProvider);
       final data = await apiClient.getAggregatorDashboard();
@@ -197,6 +198,10 @@ class _AggregatorHomeScreenState extends ConsumerState<AggregatorHomeScreen> {
             icon: const Icon(Icons.person_add_alt_1),
             tooltip: 'Assisted Onboarding',
             onPressed: _showOnboardSheet,
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => context.push('/notifications'),
           ),
           IconButton(
             icon: const Icon(Icons.logout),

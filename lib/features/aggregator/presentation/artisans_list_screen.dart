@@ -21,6 +21,7 @@ class _AggregatorArtisansListScreenState
     extends ConsumerState<AggregatorArtisansListScreen> {
   String _selectedFilter = 'All';
   bool _isLoading = true;
+  bool _hasError = false;
   List<UserModel> _artisans = [];
   final _searchController = TextEditingController();
 
@@ -39,21 +40,13 @@ class _AggregatorArtisansListScreenState
   }
 
   void _fetchArtisans() async {
+    setState(() { _isLoading = true; _hasError = false; });
     try {
       final apiClient = ref.read(apiClientProvider);
       final list = await apiClient.getAggregatorArtisans();
-      if (mounted) {
-        setState(() {
-          _artisans = list;
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _artisans = list; _isLoading = false; });
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _isLoading = false; _hasError = true; });
     }
   }
 
@@ -76,7 +69,12 @@ class _AggregatorArtisansListScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Cluster Artisans Roster')),
+      appBar: AppBar(
+        title: const Text('Cluster Artisans Roster'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchArtisans),
+        ],
+      ),
       body: Column(
         children: [
           // Search & Filter Bar
@@ -138,7 +136,20 @@ class _AggregatorArtisansListScreenState
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
+                : _hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.wifi_off, size: 48, color: AppColors.textDisabled),
+                            const SizedBox(height: 12),
+                            const Text('Could not load artisans.', style: TextStyle(color: AppColors.textSecondary)),
+                            const SizedBox(height: 12),
+                            TextButton.icon(onPressed: _fetchArtisans, icon: const Icon(Icons.refresh), label: const Text('Retry')),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _filteredArtisans.length,
                     itemBuilder: (context, index) {
@@ -181,7 +192,7 @@ class _AggregatorArtisansListScreenState
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${artisan.district}, ${artisan.state} · ${artisan.phoneNumber ?? "+91 9876543210"}',
+                                      '${artisan.district}, ${artisan.state} · ${artisan.phoneNumber ?? 'No phone'}',
                                       style: AppTextStyles.caption,
                                     ),
                                   ],

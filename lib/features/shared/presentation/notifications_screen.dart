@@ -99,16 +99,28 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 final notif = _notifications[index];
                 IconData icon;
                 Color iconColor;
+                String typeBadge;
 
                 if (notif.type == 'Inquiry') {
                   icon = Icons.chat_bubble_outline;
                   iconColor = AppColors.primary;
+                  typeBadge = 'Inquiry';
                 } else if (notif.type == 'Scheme') {
-                  icon = Icons.campaign;
-                  iconColor = AppColors.accent;
-                } else {
-                  icon = Icons.verified_outlined;
+                  icon = Icons.account_balance;
+                  iconColor = const Color(0xFFD68910);
+                  typeBadge = 'Govt Scheme';
+                } else if (notif.type == 'Verification') {
+                  icon = Icons.verified_user_outlined;
                   iconColor = AppColors.success;
+                  typeBadge = 'Verification';
+                } else if (notif.type == 'Update') {
+                  icon = Icons.inventory_2_outlined;
+                  iconColor = Colors.deepOrange;
+                  typeBadge = 'Inventory / Update';
+                } else {
+                  icon = Icons.campaign_outlined;
+                  iconColor = Colors.indigo;
+                  typeBadge = 'Announcement';
                 }
 
                 return Padding(
@@ -118,35 +130,69 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         CircleAvatar(
-                          radius: 20,
+                          radius: 22,
                           backgroundColor: iconColor.withValues(alpha: 0.12),
-                          child: Icon(icon, color: iconColor, size: 20),
+                          child: Icon(icon, color: iconColor, size: 22),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                notif.title,
-                                style: AppTextStyles.body.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      notif.title,
+                                      style: AppTextStyles.body.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: iconColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: iconColor.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Text(
+                                      typeBadge,
+                                      style: TextStyle(
+                                        color: iconColor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               Text(
                                 notif.message,
                                 style: AppTextStyles.caption.copyWith(
                                   fontSize: 13,
                                   color: AppColors.textPrimary,
+                                  height: 1.4,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                notif.sentAt ?? 'Recent',
-                                style: AppTextStyles.caption.copyWith(
-                                  fontSize: 11,
-                                ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.access_time, size: 12, color: AppColors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    notif.sentAt != null && notif.sentAt!.length >= 10
+                                        ? notif.sentAt!.substring(0, 10)
+                                        : (notif.sentAt ?? 'Recent'),
+                                    style: AppTextStyles.caption.copyWith(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
