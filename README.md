@@ -48,7 +48,7 @@ Traditional government exhibitions (**Shilp Samagam**, **Surajkund Mela**, **Dil
 
 * 📸 **Studio AI Enhancement**: Removes cluttered workshop backgrounds and optimizes studio lighting using lightweight edge models.
 * 🎙️ **Voice-to-Catalog in Native Tongues**: Transcribes voice recordings in 8 Indian languages and automatically generates bilingual English & Hindi product stories with SEO keywords via a multi-tier AI engine (Gemini 2.5 Flash + Groq Whisper & Llama 3.3 failover).
-* 💰 **Dynamic Fair Wage Pricing**: Computes fair hourly compensation (₹150/hr benchmark) and craft category multipliers (1.3× to 2.0×) blended with real-time AI market benchmarking.
+* 💰 **Dynamic Fair Wage Pricing**: Gemini Vision analyzes the product image to detect complexity (simple / moderate / intricate) with multipliers 1.0× / 1.3× / 1.6×. Cost-plus formula: `(material + labor @ ₹150/hr) × craft_multiplier × complexity_multiplier`. Suggested price is floored at 85% of the platform DB market average. B2B wholesale = 75% of retail. A live market range bar (min → avg → max) from comparable platform listings is shown in the pricing UI.
 * 🔔 **Real-Time Push & Alert Engine**: Firebase Cloud Messaging (FCM v1) delivering instant alerts for KYC verifications, inventory stockouts, government welfare schemes, exhibition stall approvals, and buyer inquiry replies.
 * 🛍️ **Direct B2B Linkages**: Connects artisans directly to verified bulk buyers and export houses without commissions.
 * 🏛️ **MoSJE Governance & Cluster Aggregation**: Enables field aggregators to onboard illiterate artisans, broadcast welfare schemes, and relay reports to Ministry Administrators.
@@ -148,7 +148,7 @@ learningdart/
   1. *Capture*: Camera viewfinder with product alignment guide, torch, and gallery import.
   2. *AI Enhance*: Calls `POST /enhance` for background removal & studio lighting + quality score badge (92/100).
   3. *Voice Cataloger*: Real voice recording (`.m4a` AAC), Gemini AI bilingual translation (`POST /catalog`), and editable fields.
-  4. *Dynamic Pricing*: 3-tier price cards (*Minimum*, *Suggested ★*, *Premium*), raw material margin calculator (`POST /suggest-price`), and 1-click publish (`POST /products`).
+  4. *Dynamic Pricing*: Passes enhanced image bytes to `POST /suggest-price` (multipart). Gemini Vision detects complexity tier. 3-tier price cards (*Minimum*, *Suggested ★*, *Premium*), complexity badge, live market range bar with min/avg/max markers from platform DB, and 1-click publish (`POST /products`).
 - **Catalogue Manager**: 2-column grid, status filter chips, inline price editing (`PUT /products/{id}/price`), stock incrementer ($+/-$), out-of-stock badge, and exhibition QR code generator dialog (`GET /products/{id}/qr`).
 - **Inquiries**: Wholesale RFQs, message thread modal, and quotation response handler (`POST /inquiries/{id}/respond`).
 - **Exhibitions**: National fairs (*Shilp Samagam*, *Surajkund Mela*, *Dilli Haat*) with 3-state stall lifecycle: `Register` ➔ `⏳ Pending MoSJE Approval` ➔ `✅ Stall Approved by MoSJE`.
