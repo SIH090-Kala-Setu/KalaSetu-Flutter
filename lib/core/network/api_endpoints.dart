@@ -80,6 +80,8 @@ class ApiEndpoints {
   static const String enhanceBatch = '/enhance/batch';
   static const String catalog = '/catalog';
   static const String suggestPrice = '/suggest-price';
+  static const String predictPrice = '/api/v1/pricing/predict-price';
+  static const String pricingHealth = '/api/v1/pricing/health';
 
   // Products
   static const String products = '/products';

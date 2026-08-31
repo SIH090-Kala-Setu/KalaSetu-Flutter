@@ -149,18 +149,36 @@ class ApiClient {
     double manufacturingHours = 4.0,
     String productDescription = '',
     Uint8List? imageBytes,
+    String? regionState,
+    int? artisanExperienceYrs,
+    int? productComplexity,
+    bool? giTagCertified,
+    int? bulkOrderQty,
   }) async {
     final formData = FormData.fromMap({
       'category': category,
       'material_cost': materialCost,
       'manufacturing_hours': manufacturingHours,
       'product_description': productDescription,
+      if (regionState != null) 'region_state': regionState,
+      if (artisanExperienceYrs != null) 'artisan_experience_yrs': artisanExperienceYrs,
+      if (productComplexity != null) 'product_complexity': productComplexity,
+      if (giTagCertified != null) 'gi_tag_certified': giTagCertified,
+      if (bulkOrderQty != null) 'bulk_order_qty': bulkOrderQty,
       if (imageBytes != null && imageBytes.isNotEmpty)
         'image': MultipartFile.fromBytes(imageBytes, filename: 'product.jpg'),
     });
     final response = await _dio.post(
       ApiEndpoints.suggestPrice,
       data: formData,
+    );
+    return PriceBreakdownModel.fromJson(response.data);
+  }
+
+  Future<PriceBreakdownModel> predictPriceML(Map<String, dynamic> payload) async {
+    final response = await _dio.post(
+      ApiEndpoints.predictPrice,
+      data: payload,
     );
     return PriceBreakdownModel.fromJson(response.data);
   }

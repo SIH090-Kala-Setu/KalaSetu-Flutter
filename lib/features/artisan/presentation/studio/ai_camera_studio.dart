@@ -68,6 +68,9 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   String _complexity = 'moderate';
   String _pricingNotes = 'Calculated using fair wage multiplier and raw material costs.';
   String? _competitorRange = '₹ 1,000 – ₹ 1,800';
+  List<Map<String, dynamic>>? _shapTopFeatures;
+  String? _mlEngineUsed;
+  double? _fairWageFloor;
   bool _isCalculatingPricing = false;
   bool _isListing = false;
 
@@ -278,7 +281,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
 
       if (mounted) {
         setState(() {
-          _minPrice = pricing.minimumBreakevenPrice;
+          _minPrice = pricing.fairWageFloorInr ?? pricing.minimumBreakevenPrice;
           _suggestedPrice = pricing.suggestedRetailPrice;
           _premiumPrice = (_suggestedPrice * 1.35).roundToDouble();
           _selectedPrice = _suggestedPrice;
@@ -289,6 +292,9 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
           _marketMin = pricing.marketMin;
           _marketMax = pricing.marketMax;
           _complexity = pricing.complexity;
+          _fairWageFloor = pricing.fairWageFloorInr;
+          _shapTopFeatures = pricing.shapTopFeatures;
+          _mlEngineUsed = pricing.mlEngineUsed;
         });
       }
     } catch (_) {
@@ -1139,12 +1145,73 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
               child: ExpansionTile(
                 initiallyExpanded: true,
                 tilePadding: EdgeInsets.zero,
-                title: Text(l10n.howCalculated, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, fontSize: 14)),
+                title: Row(
+                  children: [
+                    Text(l10n.howCalculated, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, fontSize: 14)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.shield_outlined, size: 12, color: AppColors.success),
+                          SizedBox(width: 4),
+                          Text('MoSJE Living Wage Floor', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.success)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 children: [
                   Text(
                     _pricingNotes,
                     style: AppTextStyles.caption.copyWith(height: 1.5, fontSize: 13),
                   ),
+                  if (_shapTopFeatures != null && _shapTopFeatures!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 10),
+                    const Text('Top Price Drivers (SHAP AI Explainability):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _shapTopFeatures!.map((feat) {
+                        final desc = feat['description']?.toString() ?? feat['feature']?.toString() ?? '';
+                        final val = (feat['shap_value'] as num?)?.toDouble() ?? 0.0;
+                        final isPositive = val >= 0;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isPositive ? AppColors.success.withValues(alpha: 0.08) : AppColors.accent.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isPositive ? AppColors.success.withValues(alpha: 0.3) : AppColors.accent.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Text(
+                            '$desc (${isPositive ? '+' : ''}₹ ${val.toStringAsFixed(0)})',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isPositive ? AppColors.success : const Color(0xFFD68910),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                  if (_mlEngineUsed != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      '⚡ Engine: $_mlEngineUsed',
+                      style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                 ],
               ),

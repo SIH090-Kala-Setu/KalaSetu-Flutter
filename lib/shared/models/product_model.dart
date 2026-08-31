@@ -138,6 +138,13 @@ class PriceBreakdownModel {
   final String complexity;
   final String explanation;
   final String? competitorRange;
+  final double? predictedPriceInr;
+  final double? priceLowerBoundInr;
+  final double? priceUpperBoundInr;
+  final double? fairWageFloorInr;
+  final bool floorCompliant;
+  final List<Map<String, dynamic>>? shapTopFeatures;
+  final String? mlEngineUsed;
 
   PriceBreakdownModel({
     required this.suggestedRetailPrice,
@@ -149,14 +156,30 @@ class PriceBreakdownModel {
     required this.complexity,
     required this.explanation,
     this.competitorRange,
+    this.predictedPriceInr,
+    this.priceLowerBoundInr,
+    this.priceUpperBoundInr,
+    this.fairWageFloorInr,
+    this.floorCompliant = true,
+    this.shapTopFeatures,
+    this.mlEngineUsed,
   });
 
   factory PriceBreakdownModel.fromJson(Map<String, dynamic> json) {
     final baseMat = (json['base_material_cost'] ?? 0).toDouble();
     final labor = (json['labor_cost'] ?? 0).toDouble();
     final minPrice = (json['min_price'] ?? json['minimum_breakeven_price'] ?? (baseMat + labor)).toDouble();
-    final retail = (json['suggested_retail_price'] ?? json['suggested_price'] ?? (minPrice * 1.5)).toDouble();
+    final retail = (json['suggested_retail_price'] ?? json['predicted_price_inr'] ?? json['suggested_price'] ?? (minPrice * 1.5)).toDouble();
     final b2b = (json['suggested_b2b_price'] ?? json['b2b_price'] ?? (retail * 0.75)).toDouble();
+    
+    List<Map<String, dynamic>>? shapList;
+    if (json['shap_top_features'] is List) {
+      shapList = (json['shap_top_features'] as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+
     return PriceBreakdownModel(
       suggestedRetailPrice: retail,
       suggestedB2BPrice: b2b,
@@ -167,6 +190,13 @@ class PriceBreakdownModel {
       complexity: json['complexity']?.toString() ?? 'moderate',
       explanation: json['pricing_strategy_notes']?.toString() ?? json['explanation']?.toString() ?? 'Calculated using fair wage multiplier and raw material costs.',
       competitorRange: json['competitor_range']?.toString(),
+      predictedPriceInr: (json['predicted_price_inr'] ?? retail).toDouble(),
+      priceLowerBoundInr: json['price_lower_bound_inr'] != null ? (json['price_lower_bound_inr'] as num).toDouble() : null,
+      priceUpperBoundInr: json['price_upper_bound_inr'] != null ? (json['price_upper_bound_inr'] as num).toDouble() : null,
+      fairWageFloorInr: json['fair_wage_floor_inr'] != null ? (json['fair_wage_floor_inr'] as num).toDouble() : null,
+      floorCompliant: json['floor_compliant'] != false,
+      shapTopFeatures: shapList,
+      mlEngineUsed: json['ml_engine_used']?.toString(),
     );
   }
 }
