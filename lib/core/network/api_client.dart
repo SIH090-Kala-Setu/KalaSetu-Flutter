@@ -89,12 +89,19 @@ class ApiClient {
   // AI STUDIO & ENHANCEMENT (Module 2, 3, 4)
   // ==========================================
 
-  Future<Uint8List> enhanceImage(File imageFile) async {
+  Future<Uint8List> enhanceImage({File? imageFile, Uint8List? imageBytes, String filename = 'product.png'}) async {
+    MultipartFile filePart;
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      filePart = MultipartFile.fromBytes(imageBytes, filename: filename);
+    } else if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      filePart = MultipartFile.fromBytes(bytes, filename: filename);
+    } else {
+      throw ArgumentError('Either imageBytes or imageFile must be provided');
+    }
+
     final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(
-        imageFile.path,
-        filename: imageFile.path.split(Platform.pathSeparator).last,
-      ),
+      'file': filePart,
     });
 
     final response = await _dio.post(

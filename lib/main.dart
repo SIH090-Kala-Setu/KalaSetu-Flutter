@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,14 +8,23 @@ import 'app.dart';
 import 'core/services/fcm_service.dart';
 import 'core/storage/storage_providers.dart';
 import 'core/network/api_endpoints.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-  // Must be registered before runApp
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    if (!kIsWeb) {
+      // Must be registered before runApp on native mobile platforms
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    }
+  } catch (e) {
+    debugPrint('Firebase initialization notice: $e');
+  }
 
   final sharedPreferences = await SharedPreferences.getInstance();
 

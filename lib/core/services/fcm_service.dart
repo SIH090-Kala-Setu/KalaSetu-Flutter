@@ -22,24 +22,30 @@ class FcmService {
       _foregroundStream.stream;
 
   Future<void> init(WidgetRef ref) async {
-    await _fcm.requestPermission(alert: true, badge: true, sound: true);
+    try {
+      await _fcm.requestPermission(alert: true, badge: true, sound: true);
 
-    // On Android, set foreground notification presentation
-    await _fcm.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+      // On Android/iOS, set foreground notification presentation
+      if (!kIsWeb) {
+        await _fcm.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
 
-    final token = await _fcm.getToken();
-    if (token != null) await _uploadToken(token, ref);
+      final token = await _fcm.getToken();
+      if (token != null) await _uploadToken(token, ref);
 
-    _fcm.onTokenRefresh.listen((t) => _uploadToken(t, ref));
+      _fcm.onTokenRefresh.listen((t) => _uploadToken(t, ref));
 
-    FirebaseMessaging.onMessage.listen((msg) {
-      debugPrint('FCM foreground: ${msg.notification?.title}');
-      _foregroundStream.add(msg);
-    });
+      FirebaseMessaging.onMessage.listen((msg) {
+        debugPrint('FCM foreground: ${msg.notification?.title}');
+        _foregroundStream.add(msg);
+      });
+    } catch (e) {
+      debugPrint('FCM service init notice: $e');
+    }
   }
 
   Future<void> _uploadToken(String token, WidgetRef ref) async {

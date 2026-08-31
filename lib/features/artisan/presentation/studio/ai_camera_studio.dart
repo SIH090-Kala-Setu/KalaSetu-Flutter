@@ -29,6 +29,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
 
   // Phase 1: Capture
   File? _capturedImage;
+  Uint8List? _capturedImageBytes;
   final ImagePicker _picker = ImagePicker();
   bool _isTorchOn = false;
 
@@ -90,8 +91,14 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   void _pickFromCamera() async {
     final photo = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
     if (photo != null) {
+      final bytes = await photo.readAsBytes();
       setState(() {
-        _capturedImage = File(photo.path);
+        _capturedImageBytes = bytes;
+        if (!kIsWeb) {
+          try {
+            _capturedImage = File(photo.path);
+          } catch (_) {}
+        }
         _currentPhase = 2;
       });
       _startEnhancement();
@@ -101,8 +108,14 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   void _pickFromGallery() async {
     final photo = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
     if (photo != null) {
+      final bytes = await photo.readAsBytes();
       setState(() {
-        _capturedImage = File(photo.path);
+        _capturedImageBytes = bytes;
+        if (!kIsWeb) {
+          try {
+            _capturedImage = File(photo.path);
+          } catch (_) {}
+        }
         _currentPhase = 2;
       });
       _startEnhancement();
@@ -120,9 +133,9 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
     if (mounted) setState(() => _enhanceStep = 1);
 
     try {
-      if (_capturedImage != null) {
+      if (_capturedImageBytes != null && _capturedImageBytes!.isNotEmpty) {
         final apiClient = ref.read(apiClientProvider);
-        final bytes = await apiClient.enhanceImage(_capturedImage!);
+        final bytes = await apiClient.enhanceImage(imageBytes: _capturedImageBytes);
         if (mounted) {
           setState(() {
             _enhancedBytes = bytes;
@@ -130,11 +143,19 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
             _isEnhancing = false;
           });
         }
+      } else {
+        if (mounted) {
+          setState(() {
+            _enhanceStep = 2;
+            _isEnhancing = false;
+          });
+        }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Enhancement notice: $e');
       if (mounted) {
         setState(() {
-          _enhancedBytes = _capturedImage?.readAsBytesSync();
+          _enhancedBytes = _capturedImageBytes;
           _enhanceStep = 2;
           _isEnhancing = false;
         });
@@ -269,6 +290,8 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
 
     try {
       final apiClient = ref.read(apiClientProvider);
+      final imagePayload = _enhancedBytes ?? _capturedImageBytes;
+
       final pricing = await apiClient.suggestPrice(
         category: _craftCategory,
         materialCost: _materialCost,
@@ -276,7 +299,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
         productDescription: _descEnController.text.isNotEmpty
             ? _descEnController.text
             : _titleEnController.text,
-        imageBytes: _enhancedBytes ?? _capturedImage?.readAsBytesSync(),
+        imageBytes: imagePayload,
       );
 
       if (mounted) {
@@ -297,15 +320,18 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
           _mlEngineUsed = pricing.mlEngineUsed;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint("Dynamic pricing error: $e");
       if (mounted) {
         setState(() {
-          _minPrice = _materialCost * 1.5;
-          _suggestedPrice = _materialCost * 2.5;
-          _premiumPrice = _materialCost * 3.5;
+          final laborBase = _manufacturingHours * 150.0;
+          _minPrice = (laborBase * 1.3).roundToDouble();
+          _suggestedPrice = (_materialCost * 1.5 + laborBase * 1.3).roundToDouble();
+          _premiumPrice = (_suggestedPrice * 1.35).roundToDouble();
           _selectedPrice = _suggestedPrice;
-          _b2bPrice = _selectedPrice * 0.75;
+          _b2bPrice = (_selectedPrice * 0.82).roundToDouble();
           _competitorRange = '₹ ${_minPrice.toStringAsFixed(0)} – ₹ ${_premiumPrice.toStringAsFixed(0)}';
+          _pricingNotes = 'Calculated based on raw material cost (₹$_materialCost) and ₹150/hr artisan living wage baseline for $_manufacturingHours hours.';
         });
       }
     } finally {
@@ -321,9 +347,10 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
 
       // Encode image bytes as base64 data URI
       String? base64Image;
-      if (_enhancedBytes != null && _enhancedBytes!.isNotEmpty) {
-        base64Image = 'data:image/png;base64,${base64Encode(_enhancedBytes!)}';
-      } else if (_capturedImage != null && _capturedImage!.existsSync()) {
+      final bytesToUpload = _enhancedBytes ?? _capturedImageBytes;
+      if (bytesToUpload != null && bytesToUpload.isNotEmpty) {
+        base64Image = 'data:image/png;base64,${base64Encode(bytesToUpload)}';
+      } else if (!kIsWeb && _capturedImage != null && _capturedImage!.existsSync()) {
         final bytes = await _capturedImage!.readAsBytes();
         base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       }
@@ -356,7 +383,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.error,
-            content: Text('Failed to publish product: $e'),
+            content: Text('Listing failed: $e'),
           ),
         );
       }
@@ -619,9 +646,11 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                 child: Center(
                   child: (_showAfter && _enhancedBytes != null)
                       ? Image.memory(_enhancedBytes!, fit: BoxFit.contain)
-                      : _capturedImage != null
-                          ? Image.file(_capturedImage!, fit: BoxFit.contain)
-                          : const Icon(Icons.image, size: 100, color: Colors.grey),
+                      : _capturedImageBytes != null
+                          ? Image.memory(_capturedImageBytes!, fit: BoxFit.contain)
+                          : (!kIsWeb && _capturedImage != null
+                              ? Image.file(_capturedImage!, fit: BoxFit.contain)
+                              : const Icon(Icons.image, size: 100, color: Colors.grey)),
                 ),
               ),
             ),
