@@ -26,13 +26,21 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    String rawName = json['full_name']?.toString() ?? '';
+    if (rawName.isEmpty || RegExp(r'^\+?\d[\d\s\-()]{6,}$').hasMatch(rawName.trim())) {
+      // full_name is empty or looks like a phone number — derive a clean label instead
+      final role = json['role']?.toString() ?? 'Artisan';
+      rawName = role == 'Buyer'
+          ? 'Enterprise Buyer'
+          : role == 'Aggregator'
+              ? 'Cluster Aggregator'
+              : 'Master Artisan';
+    }
+
     return UserModel(
       id: json['id']?.toString() ?? '',
       username: json['username']?.toString() ?? '',
-      fullName:
-          json['full_name']?.toString() ??
-          json['username']?.toString() ??
-          'Artisan',
+      fullName: rawName,
       email: json['email']?.toString(),
       phoneNumber: json['phone_number']?.toString(),
       role: json['role']?.toString() ?? 'Artisan',

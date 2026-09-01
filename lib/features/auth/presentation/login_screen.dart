@@ -119,7 +119,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        '• Android Emulator: http://10.0.2.2:8000\n• Physical Phone: http://<YOUR-PC-IP>:8000\n• Desktop / Web: http://127.0.0.1:8000',
+                        '• Physical Phone (LAN): http://<PC-LAN-IP>:8000\n• Android Emulator: http://10.0.2.2:8000\n• Web / Desktop: http://localhost:8000\n\n💡 Tip: Check ipconfig for your PC IP address.\nDefault port is 8000 (or 6500 if using custom port).',
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],

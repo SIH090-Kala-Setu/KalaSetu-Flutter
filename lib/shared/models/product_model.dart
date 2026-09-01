@@ -88,6 +88,9 @@ class ProductCatalogGenerated {
   final String primaryMaterial;
   final List<String> suggestedTags;
   final String? transcribedText;
+  final int estimatedMaterialCostInr;
+  final double estimatedLaborHours;
+  final String complexity;
 
   ProductCatalogGenerated({
     required this.titleEn,
@@ -98,6 +101,9 @@ class ProductCatalogGenerated {
     required this.primaryMaterial,
     required this.suggestedTags,
     this.transcribedText,
+    this.estimatedMaterialCostInr = 0,
+    this.estimatedLaborHours = 4.0,
+    this.complexity = 'moderate',
   });
 
   factory ProductCatalogGenerated.fromJson(Map<String, dynamic> json) {
@@ -108,11 +114,26 @@ class ProductCatalogGenerated {
       tagsList = (json['suggested_tags'] as List).map((e) => e.toString()).toList();
     }
 
-    String materialStr = 'Natural';
-    if (json['materials'] is List && (json['materials'] as List).isNotEmpty) {
-      materialStr = (json['materials'] as List).map((e) => e.toString()).join(', ');
-    } else if (json['primary_material'] != null) {
+    String materialStr = 'Cotton';
+    if (json['primary_material'] != null && json['primary_material'].toString().isNotEmpty) {
       materialStr = json['primary_material'].toString();
+    } else if (json['materials'] is List && (json['materials'] as List).isNotEmpty) {
+      materialStr = (json['materials'] as List).first.toString();
+    }
+
+    double laborHours = 4.0;
+    if (json['estimated_labor_hours'] != null) {
+      laborHours = (json['estimated_labor_hours'] as num).toDouble();
+    } else if (json['labor_hours'] != null) {
+      laborHours = (json['labor_hours'] as num).toDouble();
+    }
+
+    String comp = 'moderate';
+    if (json['complexity'] != null) {
+      final raw = json['complexity'].toString().toLowerCase();
+      if (raw.contains('simple')) comp = 'simple';
+      else if (raw.contains('intricate')) comp = 'intricate';
+      else comp = 'moderate';
     }
 
     return ProductCatalogGenerated(
@@ -124,6 +145,9 @@ class ProductCatalogGenerated {
       primaryMaterial: materialStr,
       suggestedTags: tagsList,
       transcribedText: json['raw_transcription']?.toString() ?? json['transcribed_text']?.toString(),
+      estimatedMaterialCostInr: (json['estimated_material_cost_inr'] as num?)?.toInt() ?? 0,
+      estimatedLaborHours: laborHours,
+      complexity: comp,
     );
   }
 }
@@ -201,3 +225,44 @@ class PriceBreakdownModel {
   }
 }
 
+class ReviewModel {
+  final String id;
+  final String reviewerName;
+  final int rating;
+  final String? comment;
+  final bool isRecommended;
+  final DateTime? createdAt;
+
+  ReviewModel({
+    required this.id,
+    required this.reviewerName,
+    required this.rating,
+    this.comment,
+    this.isRecommended = true,
+    this.createdAt,
+  });
+
+  factory ReviewModel.fromJson(Map<String, dynamic> json) {
+    return ReviewModel(
+      id: json['id']?.toString() ?? '',
+      reviewerName: json['reviewer_name']?.toString() ?? 'Anonymous Buyer',
+      rating: (json['rating'] as num?)?.toInt() ?? 5,
+      comment: json['comment']?.toString(),
+      isRecommended: json['is_recommended'] == true,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'reviewer_name': reviewerName,
+      'rating': rating,
+      'comment': comment,
+      'is_recommended': isRecommended,
+      'created_at': createdAt?.toIso8601String(),
+    };
+  }
+}

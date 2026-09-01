@@ -56,6 +56,7 @@ class _AggregatorRegistrationScreenState extends ConsumerState<AggregatorRegistr
         username: username,
         password: 'Password@123',
         role: 'Aggregator',
+        fullName: name,
         region: _selectedState,
       );
 

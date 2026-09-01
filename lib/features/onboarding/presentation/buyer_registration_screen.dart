@@ -62,6 +62,7 @@ class _BuyerRegistrationScreenState extends ConsumerState<BuyerRegistrationScree
         username: username,
         password: 'Password@123',
         role: 'Buyer',
+        fullName: name,
         region: 'Delhi',
       );
 

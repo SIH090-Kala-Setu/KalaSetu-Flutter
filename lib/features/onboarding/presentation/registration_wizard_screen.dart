@@ -216,6 +216,7 @@ class _RegistrationWizardScreenState extends ConsumerState<RegistrationWizardScr
         username: phone,
         password: _passwordCtrl.text,
         role: _role,
+        fullName: name.isNotEmpty ? name : null,
         preferredLang: _langCode,
         craftType: _craft.isNotEmpty ? _craft : null,
         region: _state.isNotEmpty ? _state : null,

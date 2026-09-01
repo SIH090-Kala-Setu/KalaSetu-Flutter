@@ -77,7 +77,9 @@ class _ArtisanHomeScreenState extends ConsumerState<ArtisanHomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final user = ref.watch(authProvider.notifier).currentUser;
-    final artisanName = user?.fullName ?? 'Karigar';
+    final rawName = user?.fullName ?? '';
+    final isPhone = rawName.isEmpty || RegExp(r'^\+?\d[\d\s\-()]{6,}$').hasMatch(rawName.trim());
+    final artisanName = isPhone ? 'Master Artisan' : rawName;
     final isVerified = user?.isVerified ?? false;
 
     return Scaffold(

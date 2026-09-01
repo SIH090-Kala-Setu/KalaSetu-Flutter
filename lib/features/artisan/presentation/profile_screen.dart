@@ -273,7 +273,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final user = ref.watch(authProvider.notifier).currentUser;
-    final artisanName = _profileData?['full_name'] ?? user?.fullName ?? 'Ramesh Chandra';
+    final rawName = _profileData?['full_name'] ?? user?.fullName ?? '';
+    final isPhone = rawName.isEmpty || RegExp(r'^\+?\d[\d\s\-()]{6,}$').hasMatch(rawName.trim());
+    final artisanName = isPhone ? 'Master Artisan' : rawName;
     final isVerified = _profileData?['is_verified'] ?? user?.isVerified ?? false;
     final craftType = _profileData?['craft_type'] ?? 'Handicrafts';
     final clusterName = _profileData?['cluster_name'] ?? (_profileData?['cluster']?['name']) ?? 'Varanasi Cluster';

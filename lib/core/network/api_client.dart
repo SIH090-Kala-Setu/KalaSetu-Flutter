@@ -41,6 +41,7 @@ class ApiClient {
     required String username,
     required String password,
     required String role,
+    String? fullName,
     String? preferredLang,
     String? craftType,
     String? region,
@@ -53,6 +54,7 @@ class ApiClient {
         'username': username,
         'password': password,
         'role': role,
+        'full_name': fullName,
         'preferred_lang': preferredLang ?? 'hi',
         'craft_type': craftType,
         'region': region,
@@ -150,6 +152,14 @@ class ApiClient {
     return ProductCatalogGenerated.fromJson(response.data);
   }
 
+  Future<ProductCatalogGenerated> generateCatalogFromImage(Uint8List imageBytes) async {
+    final formData = FormData.fromMap({
+      'image': MultipartFile.fromBytes(imageBytes, filename: 'product.jpg'),
+    });
+    final response = await _dio.post(ApiEndpoints.catalogVision, data: formData);
+    return ProductCatalogGenerated.fromJson(response.data);
+  }
+
   Future<PriceBreakdownModel> suggestPrice({
     required String category,
     required double materialCost,
@@ -161,6 +171,7 @@ class ApiClient {
     int? productComplexity,
     bool? giTagCertified,
     int? bulkOrderQty,
+    String? materialType,
   }) async {
     final formData = FormData.fromMap({
       'category': category,
@@ -172,6 +183,7 @@ class ApiClient {
       if (productComplexity != null) 'product_complexity': productComplexity,
       if (giTagCertified != null) 'gi_tag_certified': giTagCertified,
       if (bulkOrderQty != null) 'bulk_order_qty': bulkOrderQty,
+      if (materialType != null) 'material_type': materialType,
       if (imageBytes != null && imageBytes.isNotEmpty)
         'image': MultipartFile.fromBytes(imageBytes, filename: 'product.jpg'),
     });
@@ -545,4 +557,34 @@ class ApiClient {
     final list = response.data as List<dynamic>;
     return list.map((json) => GovtSchemeModel.fromJson(json)).toList();
   }
+
+  // ==========================================
+  // PRODUCT REVIEWS
+  // ==========================================
+
+  Future<List<ReviewModel>> getProductReviews(String productId) async {
+    final response = await _dio.get(ApiEndpoints.productReviews(productId));
+    final list = response.data as List<dynamic>;
+    return list.map((json) => ReviewModel.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<ReviewModel> createProductReview({
+    required String productId,
+    required int rating,
+    String? comment,
+    String? reviewerName,
+    bool isRecommended = true,
+  }) async {
+    final response = await _dio.post(
+      ApiEndpoints.productReviews(productId),
+      data: {
+        'rating': rating,
+        'comment': comment ?? '',
+        'reviewer_name': reviewerName,
+        'is_recommended': isRecommended,
+      },
+    );
+    return ReviewModel.fromJson(response.data as Map<String, dynamic>);
+  }
 }
+

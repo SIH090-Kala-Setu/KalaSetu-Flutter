@@ -79,6 +79,7 @@ class ApiEndpoints {
   static const String enhance = '/enhance';
   static const String enhanceBatch = '/enhance/batch';
   static const String catalog = '/catalog';
+  static const String catalogVision = '/catalog/vision';
   static const String suggestPrice = '/suggest-price';
   static const String predictPrice = '/api/v1/pricing/predict-price';
   static const String pricingHealth = '/api/v1/pricing/health';
@@ -90,6 +91,8 @@ class ApiEndpoints {
   static String productStock(String id) => '/products/$id/stock';
   static String productPrice(String id) => '/products/$id/price';
   static String productQr(String id) => '/products/$id/qr';
+  static String productReviews(String id) => '/products/$id/reviews';
+  static String deleteReview(String id, String reviewId) => '/products/$id/reviews/$reviewId';
 
   // Inquiries
   static const String inquiries = '/inquiries';

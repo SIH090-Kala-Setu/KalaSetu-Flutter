@@ -150,6 +150,7 @@ class _ArtisanRegistrationWizardState extends ConsumerState<ArtisanRegistrationW
         username: username,
         password: 'Password@123',
         role: 'Artisan',
+        fullName: fullName,
         preferredLang: ref.read(localeProvider).languageCode,
         craftType: _selectedCrafts.isNotEmpty ? _selectedCrafts.first : 'Handicrafts',
         region: _selectedState,

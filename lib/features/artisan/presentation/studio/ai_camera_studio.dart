@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,6 +27,7 @@ class AiCameraStudioScreen extends ConsumerStatefulWidget {
 
 class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   int _currentPhase = 1; // 1: Capture, 2: Enhance, 3: Voice/Catalog, 4: Pricing
+  int _maxReachedPhase = 1;
 
   // Phase 1: Capture
   File? _capturedImage;
@@ -46,6 +48,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   int _recordSeconds = 0;
   String? _recordedAudioPath;
   bool _isCataloging = false;
+  bool _isVisionAnalyzing = false;
   final _manualPromptController = TextEditingController();
   final _titleEnController = TextEditingController();
   final _titleHiController = TextEditingController();
@@ -75,6 +78,12 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
   bool _isCalculatingPricing = false;
   bool _isListing = false;
 
+  // Pricing Inputs
+  final _materialCostController = TextEditingController(text: '450');
+  final _laborHoursController = TextEditingController(text: '4');
+  String _materialTypeDropdownValue = 'Cotton';
+  String _complexityDropdownValue = 'moderate';
+
   @override
   void dispose() {
     _recordTimer?.cancel();
@@ -84,6 +93,8 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
     _titleHiController.dispose();
     _descEnController.dispose();
     _descHiController.dispose();
+    _materialCostController.dispose();
+    _laborHoursController.dispose();
     super.dispose();
   }
 
@@ -100,6 +111,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
           } catch (_) {}
         }
         _currentPhase = 2;
+        if (_maxReachedPhase < 2) _maxReachedPhase = 2;
       });
       _startEnhancement();
     }
@@ -117,6 +129,7 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
           } catch (_) {}
         }
         _currentPhase = 2;
+        if (_maxReachedPhase < 2) _maxReachedPhase = 2;
       });
       _startEnhancement();
     }
@@ -281,7 +294,53 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
       if (catalog.craftCategory.isNotEmpty) _craftCategory = catalog.craftCategory;
       if (catalog.suggestedTags.isNotEmpty) _tags = catalog.suggestedTags;
       if (catalog.primaryMaterial.isNotEmpty) _materials = [catalog.primaryMaterial];
+      
+      // Also fill material cost if vision provided an estimate
+      if (catalog.estimatedMaterialCostInr > 0) {
+        _materialCostController.text = catalog.estimatedMaterialCostInr.toString();
+      }
+
+      // Effort Details: Labor Hours
+      if (catalog.estimatedLaborHours > 0) {
+        _laborHoursController.text = catalog.estimatedLaborHours.toString();
+      }
+
+      // Effort Details: Primary Material Dropdown matching
+      const validMaterials = [
+        'Cotton', 'Clay', 'Bamboo', 'Silk', 'Wood', 'Canvas', 
+        'Silver', 'Brass', 'Gold', 'Stone', 'Cane', 'Leather', 
+        'Bronze', 'Wool', 'Jute', 'Copper', 'Terracotta'
+      ];
+      final matchedMat = validMaterials.firstWhere(
+        (m) => catalog.primaryMaterial.toLowerCase().contains(m.toLowerCase()),
+        orElse: () => '',
+      );
+      if (matchedMat.isNotEmpty) {
+        _materialTypeDropdownValue = matchedMat;
+      }
+
+      // Effort Details: Complexity Dropdown matching
+      final compLower = catalog.complexity.toLowerCase();
+      if (['simple', 'moderate', 'intricate'].contains(compLower)) {
+        _complexityDropdownValue = compLower;
+      }
     });
+  }
+
+  Future<void> _prefillFromVision() async {
+    final imagePayload = _enhancedBytes ?? _capturedImageBytes;
+    if (imagePayload == null || imagePayload.isEmpty) return;
+    setState(() => _isVisionAnalyzing = true);
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final catalog = await apiClient.generateCatalogFromImage(imagePayload);
+      _applyCatalogResult(catalog);
+    } catch (e) {
+      // Silent fail — artisan can still fill manually
+      debugPrint('[VisionPrefill] failed: $e');
+    } finally {
+      if (mounted) setState(() => _isVisionAnalyzing = false);
+    }
   }
 
   // --- Phase 4 Handlers (Pricing Assistant) ---
@@ -292,6 +351,10 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
       final apiClient = ref.read(apiClientProvider);
       final imagePayload = _enhancedBytes ?? _capturedImageBytes;
 
+      int mappedComplexity = 3;
+      if (_complexityDropdownValue == 'simple') mappedComplexity = 1;
+      else if (_complexityDropdownValue == 'intricate') mappedComplexity = 5;
+
       final pricing = await apiClient.suggestPrice(
         category: _craftCategory,
         materialCost: _materialCost,
@@ -300,6 +363,8 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
             ? _descEnController.text
             : _titleEnController.text,
         imageBytes: imagePayload,
+        materialType: _materialTypeDropdownValue,
+        productComplexity: mappedComplexity,
       );
 
       if (mounted) {
@@ -435,34 +500,41 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
 
   Widget _buildPhaseTab(int phase, String label, IconData icon) {
     final isActive = _currentPhase == phase;
-    final isDone = _currentPhase > phase;
+    final isDone = _maxReachedPhase > phase || _currentPhase > phase;
 
     return Expanded(
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: isDone
-                ? AppColors.success
-                : isActive
-                    ? AppColors.primary
-                    : AppColors.border,
-            child: Icon(
-              isDone ? Icons.check : icon,
-              size: 14,
-              color: isActive || isDone ? Colors.white : AppColors.textDisabled,
+      child: GestureDetector(
+        onTap: () {
+          if (phase <= _maxReachedPhase) {
+            setState(() => _currentPhase = phase);
+          }
+        },
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: isDone
+                  ? AppColors.success
+                  : isActive
+                      ? AppColors.primary
+                      : AppColors.border,
+              child: Icon(
+                isDone ? Icons.check : icon,
+                size: 14,
+                color: isActive || isDone ? Colors.white : AppColors.textDisabled,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: AppTextStyles.caption.copyWith(
-              fontSize: 11,
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
-              color: isActive ? AppColors.primary : AppColors.textSecondary,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+                color: isActive ? AppColors.primary : AppColors.textSecondary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -671,7 +743,12 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
                 child: AppButton(
                   label: l10n.useThisPhoto,
                   onPressed: () {
-                    setState(() => _currentPhase = 3);
+                    setState(() {
+                      _currentPhase = 3;
+                      if (_maxReachedPhase < 3) _maxReachedPhase = 3;
+                    });
+                    // Fire Groq vision analysis in background
+                    _prefillFromVision();
                   },
                 ),
               ),
@@ -720,10 +797,47 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Speak naturally in your regional language or enter keywords. Gemini AI will generate professional English & Hindi descriptions.',
+            'AI scans the image and pre-fills details. Speak or type to refine.',
             style: AppTextStyles.caption.copyWith(fontSize: 13),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // Vision AI Analyzing Banner
+          if (_isVisionAnalyzing) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.15),
+                    AppColors.accent.withValues(alpha: 0.10),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '🤖 Groq Vision is analyzing your product image...',
+                      style: AppTextStyles.body.copyWith(
+                        fontSize: 13,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Microphone Voice Recording Card
           AppCard(
@@ -832,65 +946,241 @@ class _AiCameraStudioScreenState extends ConsumerState<AiCameraStudioScreen> {
               ),
             ),
           ] else ...[
-            // Title fields
+            // ── Product Title (EN) ──
             AppTextField(
               controller: _titleEnController,
               label: l10n.titleEn,
               hint: 'e.g. Handcrafted Terracotta Floral Vase',
             ),
             const SizedBox(height: 12),
-            AppTextField(
-              controller: _titleHiController,
-              label: l10n.titleHi,
-              hint: 'उदा. हस्तनिर्मित टेराकोटा मिट्टी का फूलदान',
-            ),
-            const SizedBox(height: 12),
 
-            // Description fields
+            // ── Product Description (EN) ──
             AppTextField(
               controller: _descEnController,
               label: l10n.descEn,
               hint: 'English description highlighting artisanal heritage...',
               maxLines: 3,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
+
+            // ── Raw Material Cost ──
             AppTextField(
-              controller: _descHiController,
-              label: l10n.descHi,
-              hint: 'शिल्प और निर्माण तकनीक का हिंदी में विवरण...',
-              maxLines: 3,
+              controller: _materialCostController,
+              label: 'Raw Material Cost (₹)',
+              keyboardType: TextInputType.number,
+              hint: 'e.g. 450  (AI pre-filled — edit if needed)',
             ),
             const SizedBox(height: 14),
 
-            // Category & Tags
-            Row(
+            // ── Category Dropdown ──
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.category, size: 16, color: AppColors.primary),
-                const SizedBox(width: 6),
                 Text(
-                  'Category: $_craftCategory',
-                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700, fontSize: 13),
+                  'Category',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: [
+                        'Textiles', 'Pottery', 'Jewelry', 'Folk Painting',
+                        'Wood Inlay', 'Metalcraft', 'Tribal Craft', 'Handicrafts',
+                      ].contains(_craftCategory) ? _craftCategory : 'Handicrafts',
+                      isExpanded: true,
+                      items: const [
+                        'Textiles', 'Pottery', 'Jewelry', 'Folk Painting',
+                        'Wood Inlay', 'Metalcraft', 'Tribal Craft', 'Handicrafts',
+                      ].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _craftCategory = val);
+                      },
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: _tags
-                  .map((t) => Chip(
-                        label: Text(t, style: const TextStyle(fontSize: 11)),
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                        visualDensity: VisualDensity.compact,
-                      ))
-                  .toList(),
+            const SizedBox(height: 14),
+
+            // ── SEO Hashtags / Tags ──
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'SEO Hashtags',
+                      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () {
+                        // Add a new empty tag via a quick dialog
+                        final ctrl = TextEditingController();
+                        showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Add Hashtag'),
+                            content: TextField(
+                              controller: ctrl,
+                              autofocus: true,
+                              decoration: const InputDecoration(
+                                hintText: 'e.g. handmadeIndia',
+                                prefixText: '#',
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  final tag = ctrl.text.trim();
+                                  if (tag.isNotEmpty) {
+                                    setState(() => _tags = [..._tags, tag]);
+                                  }
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Add'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    ..._tags.map((t) => Chip(
+                      label: Text('#$t', style: const TextStyle(fontSize: 11)),
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                      deleteIconColor: AppColors.textSecondary,
+                      visualDensity: VisualDensity.compact,
+                      onDeleted: () => setState(() => _tags = _tags.where((e) => e != t).toList()),
+                    )),
+                  ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+            // Cost & Effort Details (Pricing Engine)
+            Text(
+              'Effort Details (For Pricing Engine)',
+              style: AppTextStyles.heading.copyWith(fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              controller: _laborHoursController,
+              label: 'Labor (Hours)',
+              keyboardType: TextInputType.number,
+              hint: 'e.g. 4.5',
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Primary Material',
+                        style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _materialTypeDropdownValue,
+                            isExpanded: true,
+                            items: const [
+                              'Cotton', 'Clay', 'Bamboo', 'Silk', 'Wood', 'Canvas', 
+                              'Silver', 'Brass', 'Gold', 'Stone', 'Cane', 'Leather', 
+                              'Bronze', 'Wool', 'Jute', 'Copper', 'Terracotta'
+                            ].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _materialTypeDropdownValue = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Complexity',
+                        style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _complexityDropdownValue,
+                            isExpanded: true,
+                            items: const [
+                              DropdownMenuItem(value: 'simple', child: Text('Simple')),
+                              DropdownMenuItem(value: 'moderate', child: Text('Moderate')),
+                              DropdownMenuItem(value: 'intricate', child: Text('Intricate')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _complexityDropdownValue = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 24),
             AppButton(
               label: 'Proceed to Pricing Assistant',
               onPressed: () {
-                setState(() => _currentPhase = 4);
+                setState(() {
+                  _materialCost = double.tryParse(_materialCostController.text.trim()) ?? 0.0;
+                  _manufacturingHours = double.tryParse(_laborHoursController.text.trim()) ?? 0.0;
+                  _currentPhase = 4;
+                  if (_maxReachedPhase < 4) _maxReachedPhase = 4;
+                });
                 _fetchDynamicPricing();
               },
             ),

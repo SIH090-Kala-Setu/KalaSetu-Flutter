@@ -8,6 +8,7 @@ import '../../../shared/models/product_model.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/product_thumbnail.dart';
+import 'product_reviews_section.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -322,6 +323,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  ProductReviewsSection(productId: widget.productId),
                 ],
               ),
             ),
